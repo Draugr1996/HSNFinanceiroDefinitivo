@@ -1,0 +1,8 @@
+/* Captura nativa no telefone. Selecionar/tirar foto não envia nem marca pago. */
+(function(root){'use strict';let selectedFile=null,objectUrl=null;
+const node=id=>document.getElementById(id);
+function reset(){selectedFile=null;if(objectUrl){URL.revokeObjectURL(objectUrl);objectUrl=null;}for(const id of ['document-file','document-camera'])if(node(id))node(id).value='';if(node('document-selected'))node('document-selected').textContent='Nenhum arquivo selecionado.';if(node('document-photo-preview')){node('document-photo-preview').hidden=true;node('document-photo-preview').removeAttribute('src');}if(node('document-clear'))node('document-clear').hidden=true;}
+function select(file){if(!file)return;reset();selectedFile=file;node('document-selected').textContent=(file.name||'Foto do documento')+' · '+(file.size/1048576).toFixed(2).replace('.',',')+' MB. Confira antes de adicionar ao histórico.';node('document-clear').hidden=false;if(['image/jpeg','image/png'].includes(file.type)){objectUrl=URL.createObjectURL(file);node('document-photo-preview').src=objectUrl;node('document-photo-preview').hidden=false;}}
+document.addEventListener('DOMContentLoaded',()=>{node('document-browse').onclick=()=>{if(typeof busy!=='undefined'&&busy)return;node('document-file').click();};node('document-take-photo').onclick=()=>{if(typeof busy!=='undefined'&&busy)return;node('document-camera').click();};for(const id of ['document-file','document-camera'])node(id).onchange=e=>select(e.target.files[0]);node('document-clear').onclick=()=>{if(typeof busy!=='undefined'&&busy)return;reset();};node('documents-dialog').addEventListener('close',reset);});
+root.HSN_ATTACHMENTS={selectFile:select,getFile:()=>selectedFile,reset};
+})(window);

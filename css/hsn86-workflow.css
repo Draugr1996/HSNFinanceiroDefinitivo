@@ -1,0 +1,62 @@
+/* HSN 8.6 — navegação operacional e fluxo bancário de contas a pagar. */
+.hsn86-brand-home{appearance:none!important;border:0!important;background:transparent!important;padding:0!important;box-shadow:none!important;color:inherit!important;text-align:left!important;display:flex!important;align-items:center!important;gap:12px!important;cursor:pointer!important}
+.hsn86-brand-home:hover strong{color:#ff9f51!important}
+.hsn8-sidebar-home[data-view]{appearance:none!important;border:1px solid transparent!important;width:calc(100% - 6px)!important;background:transparent!important;text-align:left!important;cursor:pointer!important}
+.hsn8-sidebar-home[data-view]:hover,.hsn8-sidebar-home[data-view].active{background:#1a3859!important;border-color:#2c4f71!important;color:#fff!important;border-radius:12px!important}
+.hsn8-sidebar-home[data-view].active .hsn8-home-icon{color:#ff962d!important}
+.hsn86-crumb-home{appearance:none!important;display:inline-flex!important;align-items:center!important;gap:4px!important;min-height:29px!important;padding:3px 5px!important;margin:0!important;color:var(--muted)!important;background:transparent!important;border:0!important;border-radius:7px!important;font:inherit!important;cursor:pointer!important}
+.hsn86-crumb-home:hover{background:var(--surface2)!important;color:var(--accent)!important}
+.hsn86-crumb-home:focus-visible{outline:2px solid var(--accent)!important}
+#records .hsn86-bulkbar{width:100%;grid-column:1/-1;display:grid;grid-template-columns:minmax(210px,1fr) auto;align-items:center;gap:14px 24px;padding:18px 20px;margin:0 0 14px;background:var(--surface)!important;border:1px solid var(--line)!important;border-radius:15px!important;box-shadow:var(--shadow)}
+.hsn86-bulkheading h3{margin:0!important;font-size:15px!important;font-weight:800!important;color:var(--ink)!important}
+.hsn86-bulkheading p{margin:4px 0 0!important;font-size:12px!important;line-height:1.5!important;color:var(--muted)!important}
+.hsn86-bulkdetails{text-align:right;display:grid;gap:2px;font-size:12px;color:var(--muted)}
+.hsn86-bulkdetails strong{font-size:14px;color:var(--ink)}
+.hsn86-bulkactions{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:9px}
+.hsn86-bulkactions button{padding:9px 13px!important;min-height:39px!important;border-radius:9px!important;border:1px solid var(--line)!important;background:var(--surface2)!important;color:var(--ink)!important;font-size:12px!important;font-weight:700!important;box-shadow:none!important}
+.hsn86-bulkactions button.primary{background:#ff7a16!important;border-color:#ff7a16!important;color:#fff!important}
+.hsn86-bulkactions button:disabled{opacity:.45!important;cursor:not-allowed!important}
+.hsn86-bulkhelp{grid-column:1/-1;margin:0!important;color:var(--muted)!important;font-size:11px!important;line-height:1.5}
+.hsn86-migration-alert{padding:14px 17px;margin:0 0 13px;background:var(--amber-soft);border:1px solid var(--amber);color:var(--ink);border-radius:11px;grid-column:1/-1}
+.hsn86-migration-alert strong{font-size:13px}.hsn86-migration-alert p{font-size:12px;line-height:1.5;margin:6px 0 0}
+#records .hsn86-payables-table{min-width:1000px}
+#records .hsn86-payables-table th:first-child,#records .hsn86-payables-table td:first-child{width:43px;min-width:43px;text-align:center;padding-left:10px!important;padding-right:2px!important}
+.hsn86-checkbox{appearance:auto!important;accent-color:var(--accent)!important;width:18px!important;min-width:18px!important;height:18px!important;min-height:18px!important;padding:0!important;box-shadow:none!important;cursor:pointer!important}
+.hsn86-row-selected{background:color-mix(in srgb,var(--accent) 8%,var(--surface))!important}
+.hsn86-stage{font-size:11px;line-height:1.4;font-weight:760;letter-spacing:0;display:inline-flex;align-items:center;max-width:240px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);color:var(--muted);background:var(--surface2)}
+.hsn86-stage-pending{color:var(--muted);background:var(--surface3)}
+.hsn86-stage-awaiting_signature,.hsn86-stage-scheduled_signature{color:var(--amber);background:var(--amber-soft);border-color:color-mix(in srgb,var(--amber) 45%,var(--line))}
+.hsn86-stage-scheduled{color:var(--blue);background:color-mix(in srgb,var(--blue) 13%,var(--surface));border-color:color-mix(in srgb,var(--blue) 42%,var(--line))}
+.hsn86-stage-approved{color:var(--green);background:var(--green-soft);border-color:color-mix(in srgb,var(--green) 35%,var(--line))}
+.hsn86-stage-cancelled{color:var(--red);background:var(--red-soft);border-color:color-mix(in srgb,var(--red) 40%,var(--line))}
+.hsn86-stage-paid{color:var(--green);background:var(--green-soft);border-color:color-mix(in srgb,var(--green) 35%,var(--line))}
+.hsn86-workflow-dialog{width:min(550px,calc(100vw - 24px));max-width:550px;max-height:90dvh;overflow:auto;margin:auto;border:1px solid var(--line)!important;background:var(--surface)!important;color:var(--ink)!important;border-radius:17px!important;padding:0!important;box-shadow:0 22px 70px #0008!important}
+.hsn86-workflow-dialog::backdrop{background:#030c19b8;backdrop-filter:blur(3px)}
+.hsn86-workflow-form{display:flex;flex-direction:column;gap:14px;padding:22px}
+.hsn86-workflow-form label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:650;color:var(--ink)}
+.hsn86-workflow-form :is(input,select,textarea){box-sizing:border-box;width:100%;border:1px solid var(--line)!important;border-radius:9px!important;padding:10px!important;min-height:41px;color:var(--ink)!important;background:var(--surface2)!important;font:inherit}
+.hsn86-workflow-head{padding-bottom:6px;border-bottom:1px solid var(--line)}.hsn86-workflow-head h2{margin:0;font-size:20px}.hsn86-workflow-head p{margin:4px 0 6px;color:var(--muted);font-size:12px}
+.hsn86-workflow-warning{padding:12px;background:var(--amber-soft);color:var(--ink);border-radius:9px;margin:0;font-size:12px;line-height:1.6}
+.hsn86-workflow-form .hsn86-consent{flex-direction:row;align-items:flex-start;gap:9px;line-height:1.5}
+.hsn86-consent input{width:18px!important;min-width:18px!important;height:18px!important;min-height:18px!important;margin:0!important;accent-color:var(--accent)!important}
+.hsn86-dialog-actions{display:flex;justify-content:flex-end;gap:9px;flex-wrap:wrap}
+.hsn86-dialog-actions button{min-height:39px;padding:8px 15px;border-radius:9px;border:1px solid var(--line);background:var(--surface2);color:var(--ink)}
+.hsn86-dialog-actions button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.hsn86-dialog-actions button:disabled{opacity:.4}
+#records .hsn86-dashboard-section{background:var(--surface)!important;border:1px solid var(--line)!important;border-radius:15px!important;padding:19px 21px!important;margin-bottom:15px!important;grid-column:1/-1;box-shadow:var(--shadow)}
+.hsn86-dashboard-section h2{font-size:17px;margin:0 0 5px}.hsn86-dashboard-section p{color:var(--muted);font-size:12px;margin:0 0 15px}
+.hsn86-dashboard-links{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:16px}
+#records .hsn86-dashboard-link{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;min-height:93px;padding:16px 13px!important;border:1px solid var(--line)!important;background:var(--surface2)!important;border-radius:11px!important;color:var(--ink)!important;font-size:13px;font-weight:760;white-space:normal}
+#records .hsn86-dashboard-link:hover{border-color:var(--accent)!important}
+#records .hsn86-dashboard-link small{color:var(--muted);font-size:11px;font-weight:450}
+.hsn86-dashboard-row{display:flex;gap:15px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:11px 0;border-top:1px solid var(--line)}.hsn86-dashboard-row strong{min-width:190px}.hsn86-dashboard-row span:not(.hsn86-stage){color:var(--muted);font-size:12px}
+@media(max-width:1000px){.hsn86-dashboard-links{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:780px){#records .hsn86-bulkbar{grid-template-columns:1fr;padding:15px!important}.hsn86-bulkdetails{text-align:left}.hsn86-bulkactions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.hsn86-bulkactions button{white-space:normal!important;min-height:43px!important}.hsn86-dashboard-links{grid-template-columns:repeat(2,minmax(0,1fr))}.hsn86-workflow-form{padding:17px}.hsn86-payables-table{min-width:0!important}#records .hsn86-payables-table td:first-child,#records .hsn86-payables-table th:first-child{width:auto!important}#records .hsn86-payables-table td:first-child{display:flex;align-items:center;justify-content:flex-start}}
+@media(max-width:470px){.hsn86-dashboard-links{grid-template-columns:1fr}.hsn86-bulkactions{grid-template-columns:1fr}}
+/* Corrige valores quebrados nos indicadores quando a largura disponível é menor. */
+@media(min-width:781px) and (max-width:1540px){
+ .summary .stat{padding-left:69px!important;padding-right:10px!important}
+ .summary .stat .hsn8-stat-icon{left:13px!important;width:42px;height:42px}
+ .summary .stat strong{font-size:clamp(17px,1.45vw,22px)!important;letter-spacing:-.7px!important;overflow-wrap:normal!important;word-break:normal!important}
+ .summary .stat small{font-size:11px!important}
+}

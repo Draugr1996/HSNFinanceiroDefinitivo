@@ -1,0 +1,27 @@
+# Financeiro HSN 8.9 — Otimização incremental (versão de TESTE)
+
+Base: pacote completo **Financeiro HSN 8.8** fornecido na conversa. Este pacote NÃO é um espelho confirmado do GitHub atual: se houver commits posteriores, comparar antes de instalar.
+
+## Alterações
+- Uma única folha `css/hsn89-optimized.css` reúne os sete CSS realmente carregados, na ordem original, e acrescenta acabamento de responsividade. Arquivos originais permanecem intactos para rollback.
+- No celular, linhas de Contas a pagar são exibidas em cartões de duas colunas compactas, e a barra de ações em lote usa dois botões por linha.
+- Regras de foco, contraste, redimensionamento dos modais, tablet e movimento reduzido.
+- `js/app.js`: pesquisa com atraso curto de 120 ms e indexação de texto em memória (WeakMap), sem alterar dados ou o conteúdo pesquisado.
+- `js/finance.js`: consultas simultâneas à mesma fotografia de dados financeiros compartilham a mesma Promise; depois do término, novas navegações continuam consultando o Supabase. Verificação do campo `workflow_status` apenas uma vez por sessão.
+- `service-worker.js`: pré-cache leve e sem URLs estáticas duplicadas; política network-first mantida. Nunca armazena respostas do banco, tokens, CDN ou arquivos financeiros.
+- **Não houve nenhuma alteração SQL, na Auth, nos envios Zoho, nas regras financeiras ou nos contratos das importações/exportações.**
+
+## Instalação segura
+1. Faça download ZIP do GitHub principal e guarde fora do repositório.
+2. Use repositório de TESTE. Envie **todos** os arquivos deste pacote completo preservando a estrutura; não substitua somente index.html sem os scripts alterados.
+3. Ative Pages e faça atualização forçada (Ctrl+Shift+R). Se for PWA, feche/abra ou remova a versão instalada para aplicar o service worker novo.
+4. Compare: login/logout, menu, desktop, tablet, celular, filtros, busca, Contas a pagar, DDA, pagamentos, importação CSV, recorrentes, comissões, histórico Sicoob, Zoho, alertas, anexos e relatórios.
+5. Não confirme pagamentos, envios ou exclusões reais durante a validação visual.
+6. Só depois de testar com a sua sessão e os módulos reais, avalie publicar no repositório principal.
+
+## Reversão
+Restaure o commit anterior no GitHub de teste, ou reinstale o ZIP backup da versão anterior. O novo cache usa chave distinta e limpa apenas caches antigos com o prefixo `hsn-shell-` quando ativado. Os dados do Supabase não são afetados pela reversão da interface.
+
+## Testes efetuados na construção
+- Sintaxe JavaScript, existência de arquivos, inspeção da política de cache, execução em navegador com Supabase simulado para páginas principais, modo claro/escuro e larguras de desktop, tablet e celular.
+- Não foram executadas operações financeiras reais e não foi feita auditoria de chamadas SQL/RLS em produção.

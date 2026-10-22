@@ -1,0 +1,84 @@
+/* FINANCEIRO HSN 6.0 — Premium Dashboard
+   Camada visual isolada: nao altera eventos, dados, JS nem regras de negocio. */
+:root, :root[data-theme="dark"], :root[data-theme="light"] {
+ --bg:#f4f7fb;--surface:#fff;--surface2:#f7f9fc;--surface3:#edf2f9;
+ --ink:#0c1b39;--muted:#62738d;--line:#e2e8f2;
+ --accent:#ff761b;--accent-soft:#fff0e4;--accent-ink:#b84a09;
+ --sidebar:258px;--header:76px;--shadow:0 10px 34px rgba(15,32,61,.055);
+}
+html,body{background:#f4f7fb!important;color:#102344!important;font-family:Inter,'Segoe UI',system-ui,sans-serif!important;font-size:13px!important}
+body{letter-spacing:.005em}
+.app-header{height:76px!important;background:linear-gradient(110deg,#081527,#101e35)!important;border:0!important;border-bottom:1px solid #283b57!important;padding:10px 24px!important;box-shadow:0 8px 30px #07162b18!important}
+.app-header .brand{gap:13px!important}.app-header .brand-logo{width:46px!important;height:46px!important;border:2px solid #ff751a!important;border-radius:14px!important;background:#fff!important;box-shadow:0 0 0 4px #ffffff12!important}
+.app-header .brand strong{font-size:21px!important;letter-spacing:-.8px!important;color:#fff!important}.app-header .brand strong span{color:#ff7b25!important}.app-header .brand small{color:#a4b4cd!important;font-size:11px!important}
+.app-header button,.app-header select{background:#15253e!important;color:#f2f7ff!important;border:1px solid #334764!important;border-radius:11px!important;min-height:36px!important}
+.app-header button:hover,.app-header select:hover{border-color:#ff8a3d!important}
+.workspace{background:#f4f7fb!important}
+#app{background:#f4f7fb!important}
+.sidebar{background:linear-gradient(180deg,#09192e,#0e2038 58%,#0b192d)!important;color:#edf4ff!important;border-right:1px solid #213650!important;width:258px!important;padding:18px 12px!important;box-shadow:6px 0 28px #112b4d16!important}
+.sidebar-heading{color:#738aaa!important;letter-spacing:2.3px!important;font-size:10px!important;margin:20px 10px 13px!important}
+.sidebar .navigation-toggle{background:#142942!important;color:#dce8fa!important;border:1px solid #2a405d!important;border-radius:11px!important;min-height:42px!important}
+.sidebar .nav-topic{border:0!important;background:transparent!important;border-radius:12px!important;margin:5px 0!important;overflow:hidden}
+.sidebar .nav-topic[open]{background:#142740!important}
+.sidebar .nav-topic>summary{min-height:47px!important;padding:9px 11px!important;color:#e7effb!important;border-radius:10px!important}
+.sidebar .topic-number{background:#1f3854!important;color:#9cb4d1!important;border:1px solid #334b69!important;border-radius:9px!important;width:28px!important;height:29px!important}
+.sidebar .nav-topic[open] .topic-number{background:#ff761b!important;color:#fff!important;border-color:#ff761b!important}
+.sidebar .topic-copy strong{font-size:12px!important;font-weight:700!important;color:#f1f6ff!important}
+.sidebar .topic-copy small{font-size:10px!important;color:#94a8c5!important}
+.sidebar .topic-chevron{color:#9fb5d1!important}
+.sidebar .topic-links{padding:4px 7px 11px!important;gap:3px!important}
+.sidebar .topic-links button{color:#c3d0e4!important;background:transparent!important;min-height:39px!important;border:1px solid transparent!important;border-radius:9px!important;font-size:12px!important;gap:10px!important;padding:8px 10px!important}
+.sidebar .topic-links button .nav-icon,.sidebar .topic-links button .nav-icon svg{color:#c8d9ef!important;stroke:#c8d9ef!important;opacity:1!important}
+.sidebar .topic-links button.active,.sidebar .topic-links button[aria-current="page"]{background:linear-gradient(90deg,#ff761b2e,#ff761b12)!important;border-color:#ff761b40!important;border-left:3px solid #ff761b!important;color:#ff9b58!important;font-weight:700!important}
+.sidebar .topic-links button.active .nav-icon,.sidebar .topic-links button.active .nav-icon svg,.sidebar .topic-links button[aria-current="page"] .nav-icon,.sidebar .topic-links button[aria-current="page"] .nav-icon svg{color:#ff9b58!important;stroke:#ff9b58!important}
+.sidebar .topic-links button:hover:not(.active){background:#1c3652!important;color:#fff!important}
+.sidebar .nav-count{background:#ff761b!important;color:#fff!important;border-radius:20px!important}
+.sidebar-foot{color:#9cb2cc!important;border-color:#29415e!important}
+.content{background:#f4f7fb!important;color:#102344!important;padding:24px 30px 34px!important;max-width:none!important}
+.workspace-tools{background:transparent!important;border:0!important;padding:0 0 18px!important}
+.workspace-tools #connection{color:#5c7390!important;font-size:11px!important}
+.workspace-tools button{background:#fff!important;color:#172b4a!important;border:1px solid #dce5f1!important;border-radius:10px!important;min-height:36px!important;box-shadow:0 3px 9px #152d4810!important}
+.page-heading{background:linear-gradient(115deg,#fff 0%,#fff 61%,#edf3fb 100%)!important;color:#102344!important;border:1px solid #e0e8f2!important;border-radius:20px!important;min-height:142px!important;margin:0 0 18px!important;padding:26px 30px!important;box-shadow:0 10px 35px #152b4c0a!important}
+.page-heading:before{content:''!important;position:absolute!important;right:0!important;top:0!important;width:28%!important;height:100%!important;border:0!important;border-radius:0!important;background:linear-gradient(115deg,transparent,#dce9f9a3)!important;pointer-events:none!important}
+.page-heading:after{content:''!important;position:absolute!important;left:0!important;top:0!important;bottom:0!important;width:5px!important;height:auto!important;background:linear-gradient(180deg,#ff741b,#ffb25e)!important}
+.page-heading .eyebrow{color:#eb6817!important;font-size:10px!important;letter-spacing:1.6px!important}
+.page-heading h1{color:#101f3e!important;font-size:clamp(26px,2.6vw,34px)!important;letter-spacing:-1.2px!important;font-weight:800!important}
+.page-heading p{color:#526b8b!important;font-size:12px!important}
+.page-heading #new{background:linear-gradient(125deg,#ff831e,#ff6a12)!important;color:#fff!important;border:0!important;border-radius:11px!important;box-shadow:0 7px 15px #ff761b35!important;padding:11px 17px!important;font-weight:750!important}
+.search-wrap{margin:0 0 15px!important}.search-wrap label{color:#516a8b!important;font-size:10px!important;font-weight:750!important;letter-spacing:1px!important;text-transform:uppercase!important}
+.search-wrap input{background:#fff!important;border:1px solid #dce5f0!important;border-radius:11px!important;min-height:44px!important;color:#152846!important;box-shadow:0 3px 11px #1b3b6008!important}
+.summary{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:14px!important;margin-bottom:17px!important}
+.summary .stat,.summary .sicoob-stat{background:#fff!important;border:1px solid #e0e7f1!important;border-radius:16px!important;padding:19px 20px!important;min-height:114px!important;box-shadow:0 8px 24px #142c4d0b!important;color:#142440!important}
+.summary .stat:before,.summary .sicoob-stat:before{width:4px!important;height:calc(100% - 30px)!important;left:0!important;top:15px!important;border-radius:0 5px 5px 0!important;background:#ff791f!important}
+.summary .stat:nth-child(2):before,.summary .sicoob-stat:nth-child(2):before{background:#12c991!important}
+.summary .stat:nth-child(3):before,.summary .sicoob-stat:nth-child(3):before{background:#438bff!important}
+.summary .stat:nth-child(4):before,.summary .sicoob-stat:nth-child(4):before{background:#ff5f66!important}
+.summary .stat strong,.summary .sicoob-stat strong{font-size:clamp(19px,2vw,26px)!important;font-weight:800!important;color:#0c1d3b!important;letter-spacing:-.8px!important}
+.summary .stat small,.summary .sicoob-stat small{color:#617999!important}
+.finance-controls,.sicoob-panel,.sicoob-history,.card,.record,.account-table-wrap,.sicoob-card{background:#fff!important;color:#132746!important;border:1px solid #e0e7f0!important;border-radius:16px!important;box-shadow:0 6px 25px #1934510a!important}
+.finance-controls{padding:18px!important;gap:11px!important;margin-bottom:15px!important}
+.finance-controls label,.sicoob-email-field span{color:#344d70!important;font-weight:650!important}
+.finance-controls input,.finance-controls select,.content input,.content textarea,.content select{background:#f9fbfe!important;color:#132846!important;border:1px solid #dbe5f1!important;border-radius:10px!important;min-height:39px!important}
+.content input:focus,.content textarea:focus,.content select:focus{outline:2px solid #ff9e6080!important;outline-offset:1px!important}
+.content button{border-radius:10px!important;min-height:35px!important}
+.content button:not(.secondary){background:#ff761b!important;color:#fff!important;border:1px solid #ff761b!important}
+.content button.secondary{background:#f5f8fd!important;color:#183457!important;border:1px solid #dce5f1!important}
+.content button:hover{filter:brightness(.97)}
+.records{gap:11px!important}.record,.sicoob-card{padding:15px 17px!important}.record:hover,.sicoob-card:hover{border-color:#ffc08e!important;box-shadow:0 10px 28px #152d4d12!important}
+.sicoob-panel,.sicoob-history{padding:18px!important}.sicoob-tabs{background:#f1f5fa!important;border-radius:12px!important;padding:7px!important;gap:7px!important}.sicoob-tab.active{background:#ff761b!important;color:#fff!important;border-color:#ff761b!important}
+.sicoob-card-company strong{color:#102344!important}.sicoob-card-details{gap:9px!important}
+.content table{background:#fff!important;width:100%!important;border-collapse:separate!important;border-spacing:0!important}
+.content th{background:#f3f7fc!important;color:#526c8c!important;font-size:10px!important;letter-spacing:.5px!important;text-transform:uppercase!important;padding:12px!important}
+.content td{color:#1c3656!important;padding:11px 12px!important;border-bottom:1px solid #e8eef5!important}
+.content tr:hover td{background:#fff8f1!important}
+.content-footer{color:#7286a2!important;border-color:#dfe7f1!important}
+#login{background:#fff!important;color:#152846!important;border-radius:20px!important;box-shadow:0 20px 55px #10233e1a!important}
+/* Conserto de contraste de icones: inclusive tema escuro selecionado */
+.nav-icon svg{fill:none!important;stroke:currentColor!important;stroke-width:1.8!important}
+.sidebar button,.sidebar summary{color:#dbe8f9!important}
+.sidebar button.active,.sidebar button[aria-current="page"]{color:#ff9b58!important}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid #ff8a36!important;outline-offset:2px!important}
+@media(max-width:1180px){.summary{grid-template-columns:repeat(2,minmax(0,1fr))!important}.content{padding:18px!important}}
+@media(max-width:850px){.sidebar{width:auto!important;box-shadow:none!important}.app-header{padding:10px 13px!important}.content{padding:14px!important}.page-heading{padding:22px!important;min-height:125px!important}.summary{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:520px){.summary{gap:9px!important}.summary .stat,.summary .sicoob-stat{padding:13px!important;min-height:98px!important}.page-heading h1{font-size:24px!important}.page-heading{padding:18px!important}.app-header .brand strong{font-size:16px!important}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}

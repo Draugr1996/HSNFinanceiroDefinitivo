@@ -1,0 +1,27 @@
+/* Financeiro HSN 8.8 — operações em lote e baixa com comprovante opcional. */
+#records .hsn88-bulkbar{padding:17px 19px!important;gap:10px!important}
+#records .hsn88-bulkbar h3{margin:0;color:var(--ink);font-weight:800;font-size:15px}
+#records .hsn88-bulkbar p{grid-column:1/-1;margin:0;color:var(--muted);font-size:12px;line-height:1.5}
+#records .hsn88-bulkbar .hsn86-bulkactions{align-items:center;gap:8px;margin-top:7px}
+#records .hsn88-bulkbar select{min-width:200px;min-height:40px;padding:9px 12px;background:var(--surface2)!important;border:1px solid var(--line)!important;color:var(--ink)!important;border-radius:9px;font-size:12px;font-weight:700}
+#records .hsn88-inline-select{display:inline-flex;flex-direction:row;gap:9px;align-items:center;justify-content:flex-start;color:var(--muted);font-size:12px;font-weight:700;margin:0 0 12px;cursor:pointer}
+#records .hsn88-inline-select input{margin:0;flex:none}
+#records .record:has(>.hsn88-inline-select input:checked){border-color:var(--accent)!important;box-shadow:0 0 0 1px var(--accent),var(--shadow)!important}
+.hsn88-paid-dialog{width:min(720px,calc(100vw - 20px))!important;max-width:720px!important}
+.hsn88-paid-dialog .hsn86-workflow-form{gap:14px}
+.hsn88-paid-dialog .hsn86-workflow-form h2{font-size:20px;margin:0;color:var(--ink)}
+.hsn88-paid-dialog .hsn88-help{font-size:12px;line-height:1.6;color:var(--muted);margin:0}
+.hsn88-total{display:block;padding:12px 14px;font-size:16px;border:1px solid var(--line);border-radius:11px;background:var(--surface2);color:var(--ink)}
+.hsn88-skipped{border:1px solid var(--line);border-radius:10px;padding:10px 14px;color:var(--muted);font-size:12px}
+.hsn88-skipped summary{font-weight:700;cursor:pointer;color:var(--amber)}
+.hsn88-skipped p{padding:5px 0;margin:0}
+.hsn88-missing-proof{padding:13px 15px;border-radius:10px;background:var(--amber-soft);border:1px solid color-mix(in srgb,var(--amber) 40%,var(--line));color:var(--ink);font-size:12px;line-height:1.55;margin:0}
+.hsn88-paid-entries{max-height:min(38dvh,390px);overflow:auto;display:grid;gap:9px;padding:2px}
+.hsn88-paid-row{display:grid;grid-template-columns:minmax(0,1fr) 165px;align-items:center;gap:8px 16px;padding:13px;border:1px solid var(--line);border-radius:10px;background:var(--surface2)}
+.hsn88-paid-row strong{display:block;color:var(--ink);font-size:12px;overflow-wrap:anywhere}
+.hsn88-paid-row small{display:block;font-size:11px;color:var(--muted);margin-top:3px}
+.hsn88-paid-row .hsn88-estimate-warning,.hsn88-paid-row .hsn88-no-proof{grid-column:1/-1;margin-top:0;font-size:11px;color:var(--amber)}
+.hsn88-paid-row label{font-size:11px!important;margin:0}
+.hsn88-paid-row input[type=number]{min-height:37px!important}
+#records .hsn88-inline-select:focus-within,.hsn88-paid-form :is(button,input,select,textarea):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(max-width:600px){.hsn88-paid-row{grid-template-columns:1fr}.hsn88-paid-row .hsn88-estimate-warning,.hsn88-paid-row .hsn88-no-proof{grid-column:1}.hsn88-paid-entries{max-height:35dvh}#records .hsn88-bulkbar .hsn86-bulkactions select{width:100%;grid-column:1/-1;min-width:0}}

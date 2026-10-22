@@ -1,0 +1,109 @@
+/* Financeiro HSN 8.3 — seleção múltipla DDA, modo claro/escuro e responsivo. */
+#records .dda-batch-toolbar{
+  display:flex;flex-direction:column;gap:14px;padding:19px 21px;
+  background:var(--surface);color:var(--ink);border:1px solid var(--line);
+  border-radius:16px;box-shadow:var(--shadow);
+}
+#records .dda-batch-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+#records .dda-batch-select-all{display:inline-flex;align-items:center;gap:12px;margin:0!important;color:var(--ink)!important;font-size:13px;font-weight:750;cursor:pointer;line-height:1.5}
+#records .dda-batch-select-all span{color:var(--ink)}
+#records .dda-batch-count{display:inline-block;padding:7px 11px;border:1px solid var(--line);background:var(--surface2);border-radius:9px;font-size:12px;letter-spacing:.1px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+#records .dda-batch-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#records .dda-batch-actions button{min-height:38px!important;border-radius:9px!important;font-size:12px!important;font-weight:720!important;padding:8px 13px!important;white-space:normal!important}
+#records #dda-batch-review{background:#11836c!important;color:#fff!important;border:1px solid #16947a!important}
+#records #dda-batch-review:hover:not(:disabled){background:#0c6957!important}
+#records #dda-batch-archive{background:var(--surface2)!important;color:var(--ink)!important;border:1px solid var(--line)!important}
+#records #dda-batch-restore{background:var(--surface2)!important;color:var(--ink)!important;border:1px solid var(--line)!important}
+#records #dda-batch-export{background:var(--surface2)!important;color:var(--ink)!important;border:1px solid var(--line)!important}
+#records #dda-batch-clear{background:transparent!important;color:var(--muted)!important;border:1px solid var(--line)!important}
+#records .dda-batch-actions button:disabled{opacity:.42!important;cursor:not-allowed!important;filter:none!important}
+#records .dda-batch-help{color:var(--muted);font-size:11px;line-height:1.6;margin:0!important}
+#records .dda-card.dda-selectable{transition:background .15s,border-color .15s,box-shadow .15s}
+#records .dda-card.dda-selected{border-color:var(--accent)!important;box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 20%,transparent),var(--shadow)!important}
+#records .dda-card-select{display:flex!important;align-items:center!important;gap:9px!important;margin:0 0 16px!important;padding-bottom:12px!important;border-bottom:1px solid var(--line)!important;color:var(--muted)!important;font-size:12px!important;font-weight:670!important;cursor:pointer!important}
+#records .dda-card-select span{color:var(--muted)}
+#records .dda-card-select input,#records .dda-batch-select-all input{
+  width:18px!important;height:18px!important;min-width:18px!important;min-height:18px!important;
+  margin:0!important;padding:0!important;accent-color:var(--accent)!important;cursor:pointer!important;
+  box-shadow:none!important;
+}
+@media(max-width:760px){
+ #records .dda-batch-toolbar{padding:16px 14px;gap:13px}
+ #records .dda-batch-heading{align-items:flex-start;flex-direction:column}
+ #records .dda-batch-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ #records .dda-batch-actions button{width:100%;min-height:42px!important;padding:9px 6px!important;font-size:11px!important}
+ #records #dda-batch-review{grid-column:1/-1}
+ #records .dda-batch-count{font-size:11px}
+}
+
+/* HSN 8.4 — ações financeiras em lote; cores por variáveis do tema ativo. */
+#records #dda-batch-convert{background:#2356a3!important;border:1px solid #3878cb!important;color:#fff!important}
+#records #dda-batch-convert:hover:not(:disabled){background:#1a4689!important}
+#records #dda-batch-paid{background:#0f7866!important;border:1px solid #249582!important;color:#fff!important}
+#records #dda-batch-paid:hover:not(:disabled){background:#096b5c!important}
+.hsn-dda-batch-dialog{
+  box-sizing:border-box;width:min(900px,calc(100vw - 36px));max-width:900px;
+  max-height:min(90dvh,880px);margin:auto;padding:0!important;
+  border:1px solid var(--line)!important;border-radius:19px!important;
+  color:var(--ink)!important;background:var(--surface)!important;
+  box-shadow:0 35px 90px rgba(0,0,0,.42)!important;overflow:hidden!important;
+  color-scheme:inherit;
+}
+.hsn-dda-batch-dialog::backdrop{background:rgba(2,10,24,.77);backdrop-filter:blur(3px)}
+.hsn-dda-batch-form{display:flex;flex-direction:column;max-height:min(90dvh,880px);min-width:0;margin:0!important}
+.hsn-batch-title{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:22px 26px 18px;border-bottom:1px solid var(--line);background:var(--surface2)}
+.hsn-batch-title h2{margin:0 0 6px;font-size:21px;font-weight:800;color:var(--ink)}
+.hsn-batch-title p{margin:0;max-width:660px;font-size:12px;line-height:1.6;color:var(--muted)}
+.hsn-batch-title button{min-width:auto!important;white-space:nowrap}
+.hsn-batch-content{overflow-y:auto;overscroll-behavior:contain;padding:20px 26px;display:flex;flex-direction:column;gap:14px;min-height:0}
+.hsn-batch-banner{padding:12px 15px;margin:0;border:1px solid var(--line);background:var(--surface2);border-radius:11px;color:var(--ink);font-weight:750;font-size:13px}
+.hsn-batch-defaults,.hsn-batch-item,.hsn-batch-blocked{border:1px solid var(--line);border-radius:13px;padding:16px 17px;background:var(--surface2)}
+.hsn-batch-defaults h3,.hsn-batch-blocked h3{margin:0 0 12px;color:var(--ink);font-size:14px}
+.hsn-batch-defaults>p{margin:10px 0 0;color:var(--muted);font-size:11px}
+.hsn-batch-defaults>label{display:inline-flex;flex-direction:column;vertical-align:top;width:min(100%,300px);margin:0 10px 8px 0}
+.hsn-batch-item-title{display:flex;justify-content:space-between;align-items:flex-start;gap:15px;color:var(--ink);font-size:14px}
+.hsn-batch-money{white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--green)}
+.hsn-batch-item>p{margin:7px 0 12px;color:var(--muted);font-size:12px;line-height:1.5}
+.hsn-batch-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.hsn-batch-grid>label,.hsn-batch-defaults>label{min-width:0;color:var(--ink)!important;font-weight:650;font-size:12px;line-height:1.45}
+.hsn-batch-grid select,.hsn-batch-grid input,.hsn-batch-defaults select{
+  margin-top:7px;box-sizing:border-box;width:100%;min-width:0;min-height:39px;
+  border:1px solid var(--line)!important;border-radius:9px!important;
+  background:var(--surface)!important;color:var(--ink)!important;padding:8px 10px!important;
+}
+.hsn-batch-grid input:focus,.hsn-batch-grid select:focus,.hsn-batch-defaults select:focus{outline:2px solid var(--accent);outline-offset:2px}
+.hsn-batch-warning{padding:12px;margin-top:12px;border-radius:11px;background:var(--amber-soft);border:1px solid var(--amber);font-size:12px;color:var(--ink)}
+.hsn-batch-warning p{margin:6px 0 10px;font-size:12px;line-height:1.5;color:var(--ink)}
+.hsn-batch-blocked{background:var(--amber-soft);border-color:var(--amber)}
+.hsn-batch-blocked p{margin:7px 0;color:var(--ink);font-size:12px;line-height:1.5}
+.hsn-batch-success{color:var(--green)!important;font-weight:650}
+.hsn-batch-confirm{display:flex!important;align-items:flex-start;gap:10px;margin:0!important;color:var(--ink)!important;font-weight:600;font-size:12px;line-height:1.55;cursor:pointer}
+.hsn-batch-confirm input{width:19px!important;height:19px!important;min-width:19px!important;margin:1px 0 0!important;accent-color:var(--accent)}
+.hsn-batch-consent{border:1px solid var(--line);border-radius:11px;padding:14px!important;background:var(--surface2)}
+.hsn-batch-footer{display:flex;justify-content:flex-end;gap:10px;padding:16px 26px;border-top:1px solid var(--line);background:var(--surface2)}
+.hsn-batch-footer button{padding:10px 19px!important;border-radius:9px!important;min-height:42px;font-size:13px!important;font-weight:730}
+.hsn-batch-footer button:disabled{opacity:.43!important;cursor:not-allowed}
+@media(max-width:760px){
+ #records #dda-batch-convert,#records #dda-batch-paid{grid-column:span 1}
+ .hsn-dda-batch-dialog{width:calc(100vw - 18px);max-height:92dvh;border-radius:14px!important}
+ .hsn-dda-batch-form{max-height:92dvh}
+ .hsn-batch-title{padding:16px 14px;gap:8px}
+ .hsn-batch-title h2{font-size:16px}
+ .hsn-batch-title p{font-size:11px}
+ .hsn-batch-content{padding:14px;gap:12px}
+ .hsn-batch-grid{grid-template-columns:1fr}
+ .hsn-batch-defaults,.hsn-batch-item,.hsn-batch-blocked{padding:13px}
+ .hsn-batch-item-title{font-size:13px}
+ .hsn-batch-footer{padding:12px;gap:8px}
+ .hsn-batch-footer button{flex:1;padding:10px 6px!important}
+}
+
+/* HSN 8.5 — pesquisa de fornecedores e tipos personalizáveis */
+.hsn-supplier-picker {min-width:0;display:flex;flex-direction:column;gap:8px}
+.hsn-supplier-picker input[type="search"] {min-height:42px;width:100%;border-radius:10px}
+.hsn-supplier-picker label {min-width:0}
+.hsn-account-type-actions {display:flex;align-items:flex-end;gap:8px}
+.hsn-account-type-actions button {min-height:42px;white-space:normal}
+.hsn-type-suggestions {border-radius:14px;padding:18px 22px}
+.hsn-type-suggestions p {max-width:80ch}
+@media(max-width:680px){.hsn-account-type-actions button{width:100%}}

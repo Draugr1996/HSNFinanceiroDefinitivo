@@ -1,0 +1,26 @@
+/* HSN 8.7 — Importação do relatório CSV de pagamentos, visual compatível com tema claro/escuro. */
+#import-dialog:has(.hsn87-import-toolbar){box-sizing:border-box;width:min(1190px,calc(100vw - 24px))!important;max-width:1190px!important;max-height:92dvh;overflow:auto;padding:20px!important;background:var(--surface)!important;color:var(--ink)!important;border:1px solid var(--line)!important;border-radius:16px!important}
+#import-dialog .hsn87-import-toolbar{padding:13px 16px 16px;margin:12px 0;background:var(--surface2)!important;border-radius:12px;border:1px solid var(--line)}
+#import-dialog .hsn87-import-toolbar .hint{margin:0 0 12px;color:var(--ink);font-size:12px;line-height:1.6}
+.hsn87-import-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+#import-dialog .hsn87-import-actions button{border:1px solid var(--line)!important;background:var(--surface)!important;color:var(--ink)!important;border-radius:9px!important;padding:8px 12px!important;font-size:12px!important;font-weight:700!important;min-height:36px!important}
+.hsn87-import-actions .hsn87-import-counter{font-size:13px;color:var(--accent);margin-left:auto;white-space:nowrap}
+.hsn87-import-table-wrap{max-height:55dvh;overflow:auto;border:1px solid var(--line);border-radius:11px;background:var(--surface)}
+#import-dialog .hsn87-import-table{min-width:860px;width:100%;margin:0!important;border:0!important;border-collapse:separate;border-spacing:0}
+#import-dialog .hsn87-import-table :is(th,td){text-align:left;padding:11px 10px!important;border-bottom:1px solid var(--line);font-size:12px;color:var(--ink);vertical-align:top;background:var(--surface)}
+#import-dialog .hsn87-import-table th{position:sticky;top:0;z-index:2;background:var(--surface2)!important;color:var(--muted);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+#import-dialog .hsn87-import-table td:first-child{width:55px;text-align:center}
+#import-dialog .hsn87-import-table td:nth-child(2){min-width:205px}
+#import-dialog .hsn87-import-table td:nth-child(3){min-width:155px}
+#import-dialog .hsn87-import-table td:last-child{min-width:220px}
+#import-dialog .hsn87-import-table small{display:block;font-size:11px;line-height:1.45;color:var(--muted);margin-top:4px;white-space:normal}
+#import-dialog .hsn87-import-table strong{font-weight:740}
+#import-dialog .hsn87-import-table input[type=checkbox]{appearance:auto!important;accent-color:var(--accent)!important;width:16px!important;min-width:16px!important;height:16px!important;min-height:16px!important;padding:0!important;box-shadow:none!important}
+#import-dialog .hsn87-import-table .hsn87-state{display:inline-block;border-radius:6px;background:var(--surface2);color:var(--ink);font-weight:700;padding:4px 8px;border:1px solid var(--line);font-size:11px}
+#import-dialog .hsn87-import-table .hsn87-import-paid td{background:color-mix(in srgb,var(--amber) 5%,var(--surface))!important}
+#import-dialog .hsn87-import-table .hsn87-import-error td{opacity:.65}
+#import-dialog .hsn87-import-table .hsn87-error{color:var(--red)!important;font-weight:650}
+#import-dialog .hsn87-import-table .hsn87-ack{display:flex;align-items:flex-start;gap:7px;font-size:11px;color:var(--ink)!important;line-height:1.5;white-space:normal;margin-top:9px;max-width:290px}
+#import-dialog .hsn87-import-table .hsn87-ack input{flex:none;margin:1px 0}
+#import-dialog #import-confirm{background:var(--accent)!important;border-color:var(--accent)!important;color:white!important;border-radius:9px!important;font-weight:750!important;padding:12px 18px!important;margin-top:14px!important;min-height:44px}
+@media(max-width:720px){#import-dialog:has(.hsn87-import-toolbar){padding:12px!important}.hsn87-import-actions{align-items:stretch}.hsn87-import-actions .hsn87-import-counter{width:100%;margin-left:0}.hsn87-import-table-wrap{max-height:60dvh}}

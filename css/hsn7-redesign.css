@@ -1,0 +1,197 @@
+/* HSN 7 — redesign estrutural. Camada visual independente, sem tocar em operações. */
+:root,:root[data-theme="light"],:root[data-theme="dark"]{--bg:#f4f7fc;--surface:#fff;--surface2:#f6f8fc;--surface3:#edf2fa;--ink:#142344;--muted:#627392;--line:#e1e8f2;--accent:#ff7419;--accent-soft:#fff0e5;--accent-ink:#c64d08;--sidebar:272px;--header:82px;--shadow:0 10px 35px rgba(20,43,86,.07);--purple:#735ce3;--purple-soft:#f0edff;color-scheme:light}
+body{background:#f4f7fc!important;color:#142344!important;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif!important;font-size:13px!important}
+.app-header{background:#0b192c!important;color:#fff!important;height:82px!important;padding:13px 25px!important;border:0!important;box-shadow:0 5px 20px #08152916!important;gap:30px!important}.app-header .brand{min-width:265px!important}.app-header .brand-logo{width:46px!important;height:46px!important;border:2px solid #ff7419!important;background:white!important;border-radius:13px!important}.app-header .brand strong{font-size:21px!important;color:#fff!important;font-weight:800!important}.app-header .brand strong span{color:#ff781f!important}.app-header .brand small{color:#a9bdd9!important}.header-actions{gap:10px!important}.header-actions button,.header-actions select{background:#14263f!important;border:1px solid #334968!important;color:#f4f8ff!important;border-radius:12px!important;min-height:39px!important;font-weight:650!important}.theme-choice{color:#a7bbd6!important}
+.hsn7-top-search{height:43px;max-width:480px;width:36vw;display:flex;align-items:center;gap:11px;border:1px solid #314968;border-radius:13px;background:#14243b;padding:0 14px;color:#b5c7df}.hsn7-top-search svg{width:19px;height:19px;flex-shrink:0}.hsn7-top-search input{min-width:0;flex:1;border:0!important;outline:0!important;background:transparent!important;color:#fff!important;box-shadow:none!important;padding:0!important;font-size:13px!important}.hsn7-top-search input::placeholder{color:#9fb0c9!important}
+.workspace{background:#f4f7fc!important}.sidebar{background:#0d1b2e!important;color:#e9f0fa!important;border-right:0!important;padding:19px 12px!important;box-shadow:5px 0 20px #0c1b2a15!important}.sidebar-heading{color:#7c97b9!important;letter-spacing:2px!important;font-size:10px!important;margin:18px 9px 10px!important}.sidebar .navigation-toggle{background:#192e49!important;color:#f6faff!important;border:1px solid #314763!important;border-radius:12px!important}.sidebar .nav-topic{background:transparent!important;border:0!important;margin:2px 0!important;border-radius:12px!important;overflow:hidden!important}.sidebar .nav-topic[open]{background:#132741!important}.sidebar .nav-topic>summary{min-height:50px!important;padding:10px 12px!important;color:#e8f1ff!important;gap:12px!important}.sidebar .nav-topic>summary:hover{background:#1c3351!important}.sidebar .topic-number{display:grid!important;place-items:center!important;background:#1b304a!important;border:1px solid #294361!important;color:#d9e6f8!important;width:35px!important;height:35px!important;border-radius:10px!important;flex-shrink:0!important}.sidebar .topic-number svg{width:19px;height:19px}.sidebar .nav-topic[open] .topic-number,.sidebar .nav-topic.has-current .topic-number{color:#ff8b3c!important;background:#3a2d2b!important;border-color:#8d4d2c!important}.sidebar .topic-copy strong{color:#eef4fc!important;font-size:13px!important;font-weight:750!important}.sidebar .topic-copy small{display:none!important}.sidebar .topic-chevron{color:#9bb2cf!important}.sidebar .topic-links{padding:0 7px 9px 12px!important;gap:2px!important}.sidebar .topic-links button{min-height:39px!important;border:0!important;border-radius:9px!important;padding:9px 11px!important;font-size:12px!important;color:#b7c9e1!important;gap:10px!important;background:transparent!important}.sidebar .topic-links button .nav-icon{color:#a4bbd8!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;width:20px!important;min-width:20px!important}.sidebar .topic-links button .nav-icon svg{width:18px!important;height:18px!important;stroke:currentColor!important}.sidebar .topic-links button.active,.sidebar .topic-links button[aria-current="page"],.sidebar .topic-links button.commission-nav.active{background:linear-gradient(90deg,#523321,#332a2b)!important;color:#ff9146!important;box-shadow:inset 3px 0 #ff7419!important;font-weight:750!important}.sidebar .topic-links button.active .nav-icon,.sidebar .topic-links button[aria-current="page"] .nav-icon{color:#ff9146!important}.sidebar-foot{border-top:1px solid #29415f!important;color:#b3c5dc!important;padding-top:18px!important}.sidebar-foot div{color:#7f97b6!important}
+.content{background:#f4f7fc!important;color:#142344!important;padding:21px clamp(20px,2.8vw,42px) 32px!important;max-width:none!important}.workspace-tools{margin:0 0 12px!important;padding:0!important;border:0!important;min-height:35px!important}.workspace-tools #connection{font-size:11px!important;color:#617799!important}.workspace-tools button{background:white!important;color:#243a60!important;border:1px solid #d9e3f0!important;border-radius:10px!important;min-height:36px!important;font-size:12px!important;box-shadow:0 2px 6px #12294d08!important}.hsn7-breadcrumb{font-size:10px!important;letter-spacing:1.6px!important;font-weight:800!important;color:#7d90af!important;margin:0 0 15px!important}.page-heading{background:linear-gradient(110deg,#fff 0%,#fff 51%,#e8f0fc 80%,#dce8f8 100%)!important;min-height:167px!important;border:1px solid #e1e9f4!important;border-radius:22px!important;box-shadow:0 15px 36px #122b4a0b!important;padding:28px 32px!important;margin:0 0 16px!important;position:relative!important;overflow:hidden!important;color:#142344!important}.page-heading:before{content:''!important;position:absolute!important;right:-85px!important;top:-130px!important;width:340px!important;height:340px!important;border:48px solid #ff741911!important;border-radius:50%!important;pointer-events:none!important}.page-heading:after{content:''!important;position:absolute!important;left:0!important;top:0!important;bottom:0!important;width:5px!important;background:linear-gradient(#ff7419,#ffb269)!important}.page-heading .eyebrow{color:#f26b17!important;font-weight:850!important;letter-spacing:1.6px!important;font-size:10px!important}.page-heading h1{color:#0f1e3d!important;font-size:clamp(26px,3vw,38px)!important;font-weight:850!important;letter-spacing:-1.4px!important;margin:4px 0 3px!important}.page-heading p,.page-heading .muted{color:#597092!important;font-size:13px!important}.page-heading #new{background:#ff7419!important;color:white!important;border:0!important;border-radius:12px!important;box-shadow:0 9px 18px #ff741933!important;font-weight:800!important;padding:11px 17px!important;position:relative!important;z-index:1!important}.hsn7-button-icon{width:17px;height:17px;vertical-align:-3px;margin-right:6px}
+.search-wrap{margin:0 0 15px!important;max-width:850px!important}.search-wrap label{color:#53698d!important;text-transform:uppercase!important;font-size:10px!important;letter-spacing:1.3px!important;font-weight:800!important}.search-wrap input{height:43px!important;background:#fff!important;border:1px solid #dce5f2!important;color:#142344!important;border-radius:12px!important;padding:10px 15px!important;box-shadow:0 2px 7px #12294d07!important}
+.summary{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:14px!important;margin:0 0 15px!important}.summary .stat,.summary .sicoob-stat{background:white!important;color:#172647!important;border:1px solid #e0e8f4!important;border-radius:17px!important;box-shadow:0 10px 25px #102e540a!important;padding:19px 19px 18px 21px!important;min-height:118px!important;position:relative!important;overflow:hidden!important}.summary .stat:before,.summary .sicoob-stat:before{content:''!important;position:absolute!important;left:0!important;top:0!important;bottom:0!important;width:4px!important;height:auto!important;border-radius:0!important;background:#ff7419!important}.summary .stat:nth-child(2):before,.summary .sicoob-stat:nth-child(2):before{background:#10c993!important}.summary .stat:nth-child(3):before,.summary .sicoob-stat:nth-child(3):before{background:#397bff!important}.summary .stat:nth-child(4):before,.summary .sicoob-stat:nth-child(4):before{background:#ff5e67!important}.summary .stat small,.summary .sicoob-stat small{color:#5d7295!important;font-size:12px!important}.summary .stat strong,.summary .sicoob-stat strong{color:#102144!important;font-size:clamp(20px,2vw,28px)!important;font-weight:850!important;letter-spacing:-.8px!important}.summary .stat .muted{color:#7587a4!important}
+.finance-controls,.sicoob-panel,.sicoob-history,.card,.record,.account-table-wrap,.sicoob-card,.calendar-wrap{background:#fff!important;color:#152747!important;border:1px solid #e1e8f2!important;border-radius:17px!important;box-shadow:0 8px 24px #112b5309!important}.finance-controls{padding:18px!important;gap:12px!important;margin-bottom:16px!important}.content input,.content select,.content textarea{background:#f9fbff!important;color:#182c4f!important;border:1px solid #dbe4f1!important;border-radius:10px!important;min-height:38px!important}.content button{border-radius:10px!important}.content button:not(.secondary):not(.sicoob-tab){background:#ff7419;color:#fff;border-color:#ff7419}.content button.secondary{background:#f5f8fc;color:#233d63;border:1px solid #dce6f3}.content label{color:#536b8e!important}.record,.sicoob-card{padding:16px!important}.record:hover,.sicoob-card:hover{border-color:#ffc5a0!important;box-shadow:0 12px 28px #0f294818!important}.sicoob-history{padding:19px!important;margin-bottom:15px!important}.sicoob-panel{padding:17px!important}.sicoob-tabs{background:#f3f6fb!important;padding:6px!important;border-radius:12px!important}.sicoob-tab.active{background:#152947!important;color:#fff!important;border-color:#152947!important}.sicoob-card-company strong{color:#142747!important}.sicoob-table-heading{border-color:#e1e9f3!important}
+.content table{background:#fff!important;width:100%!important;border-collapse:separate!important;border-spacing:0!important}.content th{background:#f5f8fd!important;color:#587093!important;font-size:10px!important;font-weight:800!important;text-transform:uppercase!important;letter-spacing:.5px!important;padding:13px!important}.content td{border-bottom:1px solid #e9eef7!important;color:#263a5b!important;padding:12px 13px!important}.content tr:hover td{background:#fff8f3!important}.content-footer{color:#8495b1!important;border-color:#e0e8f3!important}.content .hint{background:#f5f8fc!important;color:#52698a!important;border:1px solid #e2eaf5!important}.content .pill{font-weight:750!important}
+#login{background:white!important;color:#142344!important;border-radius:22px!important;box-shadow:0 25px 60px #102b5030!important}
+@media(max-width:1200px){.hsn7-top-search{width:26vw}.summary{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:850px){.app-header{height:68px!important;padding:9px 13px!important;gap:8px!important}.app-header .brand{min-width:0!important}.hsn7-top-search{display:none!important}.sidebar{padding:10px 13px!important}.sidebar .navigation-toggle{display:flex!important}.content{padding:16px!important}.page-heading{min-height:130px!important;padding:22px!important}.summary{grid-template-columns:repeat(2,minmax(0,1fr))!important}.sidebar .nav-topic>summary{min-height:48px!important}}
+@media(max-width:560px){.app-header .brand strong{font-size:15px!important}.app-header .brand-logo{width:36px!important;height:36px!important}.header-actions{gap:4px!important}.header-actions button{font-size:10px!important;padding:6px!important}.content{padding:12px!important}.page-heading{padding:18px!important;min-height:125px!important}.page-heading h1{font-size:25px!important}.page-heading #new{padding:10px!important;font-size:11px!important}.summary{gap:8px!important}.summary .stat,.summary .sicoob-stat{padding:13px!important;min-height:95px!important}.summary .stat strong,.summary .sicoob-stat strong{font-size:19px!important}.hsn7-breadcrumb{font-size:8px!important}}
+
+/* HSN 7.1: corrigir recolhimento e respeitar preferencia de tema. */
+@media(min-width:851px){
+ html.hsn-sidebar-collapsed{--sidebar:68px!important}
+ html.hsn-sidebar-collapsed .sidebar{width:68px!important;min-width:68px!important;padding:12px 6px!important;overflow-x:hidden!important}
+ html.hsn-sidebar-collapsed .sidebar .nav-topic{overflow:visible!important}
+ html.hsn-sidebar-collapsed .sidebar .nav-topic>summary{padding:7px 3px!important;justify-content:center!important}
+ html.hsn-sidebar-collapsed .sidebar .sidebar-heading,html.hsn-sidebar-collapsed .sidebar .sidebar-foot,html.hsn-sidebar-collapsed .sidebar .topic-copy,html.hsn-sidebar-collapsed .sidebar .topic-chevron,html.hsn-sidebar-collapsed .sidebar .topic-links,html.hsn-sidebar-collapsed .sidebar .hsn-collapse-label{display:none!important}
+}
+.sidebar .hsn-collapse-btn{width:100%!important;min-height:40px!important;max-height:42px!important;padding:8px!important;margin-bottom:10px!important;border-radius:10px!important;background:#192e49!important;color:#fff!important;border:1px solid #344d6d!important;font-size:12px!important;box-shadow:none!important}
+.sidebar .hsn-collapse-btn svg{width:19px!important;height:19px!important;flex-shrink:0!important}
+html[data-theme="dark"]{--bg:#101827!important;--surface:#19263a!important;--surface2:#1c2b42!important;--surface3:#23344d!important;--ink:#eaf1fc!important;--muted:#a9bad3!important;--line:#34465e!important;--accent:#ff812e!important;--accent-soft:#453126!important;--accent-ink:#ffb17e!important;--shadow:0 10px 35px rgba(0,0,0,.20)!important;color-scheme:dark!important}
+html[data-theme="dark"] body,html[data-theme="dark"] .workspace,html[data-theme="dark"] .content{background:#101827!important;color:#eaf1fc!important}
+html[data-theme="dark"] .page-heading{background:linear-gradient(105deg,#1a2940 0%,#233753 100%)!important;border-color:#34465e!important}
+html[data-theme="dark"] .page-heading::before,html[data-theme="dark"] .page-heading::after{opacity:.08!important}
+html[data-theme="dark"] .page-heading h1,html[data-theme="dark"] .page-heading h2,html[data-theme="dark"] .summary strong,html[data-theme="dark"] .summary .value,html[data-theme="dark"] .content h2,html[data-theme="dark"] .content h3{color:#f1f5ff!important}
+html[data-theme="dark"] .summary>*,html[data-theme="dark"] .content .panel,html[data-theme="dark"] .content .card,html[data-theme="dark"] .content .filters,html[data-theme="dark"] .content .table-wrap,html[data-theme="dark"] .content .records,html[data-theme="dark"] .sicoob-panel{background-color:#19263a!important;color:#eaf1fc!important;border-color:#34465e!important}
+html[data-theme="dark"] .content input,html[data-theme="dark"] .content select,html[data-theme="dark"] .content textarea,html[data-theme="dark"] .hsn7-top-search input{background:#132036!important;color:#f1f5ff!important;border-color:#3b506b!important}
+html[data-theme="dark"] .content input::placeholder,html[data-theme="dark"] .hsn7-top-search input::placeholder{color:#91a5c2!important}
+html[data-theme="dark"] .content table,html[data-theme="dark"] .content th,html[data-theme="dark"] .content td{color:#eaf1fc!important;border-color:#34465e!important}
+html[data-theme="dark"] .content th{background:#23344d!important}
+html[data-theme="dark"] .content tr:nth-child(even){background:#1c2b42!important}
+html[data-theme="dark"] .content p,html[data-theme="dark"] .content label,html[data-theme="dark"] .content small{color:#b5c5db!important}
+
+/* HSN 7.2 — acabamento do modo escuro.
+   Somente apresentação: não altera menus, cobranças, eventos ou integrações.
+   Específico para evitar texto claro sobre superfícies brancas na tela Sicoob. */
+html[data-theme="dark"] .content .sicoob-history,
+html[data-theme="dark"] .content .sicoob-panel,
+html[data-theme="dark"] .content .sicoob-card,
+html[data-theme="dark"] .content .finance-controls,
+html[data-theme="dark"] .content .record,
+html[data-theme="dark"] .content .account-table-wrap,
+html[data-theme="dark"] .content .calendar-wrap,
+html[data-theme="dark"] .content .card {
+  background:#19263a!important;
+  color:#edf3ff!important;
+  border-color:#34465e!important;
+  box-shadow:0 8px 24px rgba(0,0,0,.17)!important;
+}
+html[data-theme="dark"] .content .sicoob-history-head,
+html[data-theme="dark"] .content .sicoob-history-head h2,
+html[data-theme="dark"] .content .sicoob-table-heading h2,
+html[data-theme="dark"] .content .sicoob-card-company strong,
+html[data-theme="dark"] .content .sicoob-card-field strong,
+html[data-theme="dark"] .content .sicoob-stat-value,
+html[data-theme="dark"] .content .sicoob-money,
+html[data-theme="dark"] .content .record strong,
+html[data-theme="dark"] .content .card strong {
+  color:#f4f7ff!important;
+}
+html[data-theme="dark"] .content .sicoob-history-info,
+html[data-theme="dark"] .content .sicoob-table-heading span,
+html[data-theme="dark"] .content .sicoob-card-field span,
+html[data-theme="dark"] .content .sicoob-card-company span,
+html[data-theme="dark"] .content .sicoob-card-company small,
+html[data-theme="dark"] .content .sicoob-stat-label,
+html[data-theme="dark"] .content .sicoob-stat-detail {
+  color:#b8c9e0!important;
+}
+html[data-theme="dark"] .content .sicoob-history-scroll,
+html[data-theme="dark"] .content .sicoob-table-wrap,
+html[data-theme="dark"] .content .sicoob-card-field {
+  background:#172438!important;
+  border-color:#34465e!important;
+}
+html[data-theme="dark"] .content table,
+html[data-theme="dark"] .content .sicoob-history-table,
+html[data-theme="dark"] .content .sicoob-table {
+  background:#19263a!important;
+  color:#edf3ff!important;
+}
+html[data-theme="dark"] .content table thead,
+html[data-theme="dark"] .content table th,
+html[data-theme="dark"] .content .sicoob-history-table th {
+  background:#273952!important;
+  color:#d6e3f7!important;
+  border-color:#3b506b!important;
+}
+html[data-theme="dark"] .content table tbody,
+html[data-theme="dark"] .content table tr,
+html[data-theme="dark"] .content table td,
+html[data-theme="dark"] .content .sicoob-history-table td,
+html[data-theme="dark"] .content .sicoob-history-table td small {
+  background:transparent!important;
+  color:#e4ecfa!important;
+  border-color:#34465e!important;
+}
+html[data-theme="dark"] .content table tbody tr:hover td,
+html[data-theme="dark"] .content table tbody tr:hover,
+html[data-theme="dark"] .content .sicoob-card:hover,
+html[data-theme="dark"] .content .record:hover {
+  background:#263a56!important;
+}
+html[data-theme="dark"] .content .sicoob-tabs {
+  background:#132036!important;
+  border:1px solid #31465f!important;
+}
+html[data-theme="dark"] .content .sicoob-tab {
+  background:#20324a!important;
+  color:#dbe7f7!important;
+  border:1px solid #3a516d!important;
+}
+html[data-theme="dark"] .content .sicoob-tab.active {
+  background:#ff812e!important;
+  color:#131d2e!important;
+  border-color:#ff812e!important;
+}
+html[data-theme="dark"] .content .sicoob-history-state.sent,
+html[data-theme="dark"] .content .sicoob-status.sicoob-sent,
+html[data-theme="dark"] .content .sicoob-status.sicoob-paid {
+  background:#153e36!important;
+  color:#6de6bd!important;
+}
+html[data-theme="dark"] .content .sicoob-history-state.processing {
+  background:#4b3b1e!important;
+  color:#ffdb79!important;
+}
+html[data-theme="dark"] .content .sicoob-history-state.failed {
+  background:#4c2934!important;
+  color:#ffb4ba!important;
+}
+html[data-theme="dark"] .content .sicoob-notice,
+html[data-theme="dark"] .content .hint,
+html[data-theme="dark"] .content .sicoob-empty {
+  background:#20314a!important;
+  color:#cad8ea!important;
+  border-color:#3b516d!important;
+}
+html[data-theme="dark"] .content .sicoob-history-tools input,
+html[data-theme="dark"] .content .sicoob-history-tools select,
+html[data-theme="dark"] .content .sicoob-email-group input,
+html[data-theme="dark"] .content .sicoob-card-email input {
+  background:#112039!important;
+  color:#f1f6ff!important;
+  border:1px solid #405777!important;
+}
+html[data-theme="dark"] .content .sicoob-history-tools input::placeholder,
+html[data-theme="dark"] .content .sicoob-card-email input::placeholder {
+  color:#a4bad6!important;
+}
+html[data-theme="dark"] .content .sicoob-history-tools button,
+html[data-theme="dark"] .content button.secondary {
+  background:#283a54!important;
+  color:#ecf3ff!important;
+  border-color:#45607e!important;
+}
+html[data-theme="dark"] .content .sicoob-stat,
+html[data-theme="dark"] .content .summary .stat,
+html[data-theme="dark"] .content .summary .sicoob-stat {
+  background:#1a2940!important;
+  border-color:#354a67!important;
+  color:#eaf1fc!important;
+}
+html[data-theme="dark"] .content .summary .stat strong,
+html[data-theme="dark"] .content .summary .sicoob-stat strong,
+html[data-theme="dark"] .content .summary .stat small,
+html[data-theme="dark"] .content .summary .sicoob-stat small {
+  color:#eef4ff!important;
+}
+html[data-theme="dark"] .content .summary .stat .muted,
+html[data-theme="dark"] .content .summary .sicoob-stat .muted {
+  color:#adc0db!important;
+}
+html[data-theme="dark"] .content .page-heading p,
+html[data-theme="dark"] .content .page-heading .muted,
+html[data-theme="dark"] .content .search-wrap label {
+  color:#c5d6ec!important;
+}
+/* Mantém os campos legíveis também nos modais, sem interferir nos eventos. */
+html[data-theme="dark"] dialog {
+  background:#1b2940!important;
+  color:#edf3ff!important;
+  border-color:#3a506d!important;
+}
+html[data-theme="dark"] dialog input,
+html[data-theme="dark"] dialog textarea,
+html[data-theme="dark"] dialog select {
+  background:#112039!important;
+  color:#eef5ff!important;
+  border-color:#435b7b!important;
+}
