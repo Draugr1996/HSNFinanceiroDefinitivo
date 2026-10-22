@@ -26,7 +26,26 @@ async function addRecommendedTypes(){
 const supplierFields=[['legal_name','Razão social / nome completo',true],['trade_name','Nome fantasia'],['tax_id','CNPJ / CPF (opcional)'],['service_type','Tipo de serviço'],['postal_code','CEP'],['street','Logradouro'],['address_number','Número'],['complement','Complemento'],['neighborhood','Bairro'],['city','Cidade'],['state','UF'],['bank','Banco'],['bank_branch','Agência'],['bank_account','Conta'],['pix_key','Chave PIX'],['notes','Observações']];
 const recordSearchIndex=new WeakMap();
 let db=null,user=null,view=HSN_PUSH.initialView(),rows=[],templates=[],editing=null,waSupplier=null,busy=false,loadToken=0,installPrompt=null;
-function notice(message='',error=false){$('notice').textContent=message;$('notice').className=error?'error':'';}
+// HSN 8.9.2 — avisos descartáveis: fechamento manual e automático.
+let hsnNoticeTimer=null;
+function notice(message='',error=false){
+ const area=$('notice');
+ if(!area)return;
+ if(hsnNoticeTimer!==null){clearTimeout(hsnNoticeTimer);hsnNoticeTimer=null;}
+ area.replaceChildren();
+ area.className=error?'error':'';
+ if(!message)return;
+ const content=document.createElement('span');
+ content.className='hsn-notice-text';content.textContent=String(message);
+ const close=document.createElement('button');
+ close.type='button';close.className='hsn-notice-close';close.textContent='×';
+ close.setAttribute('aria-label','Fechar aviso');close.title='Fechar mensagem';
+ close.addEventListener('click',()=>notice());
+ area.append(content,close);
+ // Erros permanecem um pouco mais para permitir leitura.
+ hsnNoticeTimer=setTimeout(()=>notice(),error?12000:7000);
+}
+
 function connected(){ $('connection').textContent=navigator.onLine?'Conectado · dados no Supabase':'Sem internet · conecte-se para consultar ou salvar'; }
 function failure(error){notice(error?.message||'Não foi possível concluir. Verifique a conexão.',true);}
 function requireOnline(){if(!navigator.onLine) throw new Error('Sem internet. Os dados não foram salvos. Reconecte e tente novamente.');}
@@ -142,4 +161,57 @@ async function init(){
  const data=check(await db.auth.getSession());await acceptSession(data.session);
  }catch(e){failure(e);}
 }
+
+// HSN 8.9.2 — calendário compacto: preserva os botões e seus ouvintes.
+function initializeCompactCalendar(){
+ const board=$('calendar-board');if(!board)return;
+ const MAX_VISIBLE=3;
+ function updateDay(day){
+  const events=Array.from(day.children).filter(node=>node.classList?.contains('calendar-event'));
+  if(!events.length)return;
+  for(const item of events){
+   if(item.dataset.hsnCompact==='1')continue;
+   item.dataset.hsnCompact='1';
+   const label=item.textContent.trim();
+   item.title=label;item.setAttribute('aria-label',label);
+   const found=label.match(/^(.*)\s+·\s+(R\$\s*[\d.,]+)$/);
+   if(found){
+    const name=document.createElement('span');name.className='hsn-calendar-item-title';name.textContent=found[1];
+    const value=document.createElement('span');value.className='hsn-calendar-item-value';value.textContent=found[2];
+    item.replaceChildren(name,value);
+   }
+  }
+  let more=Array.from(day.children).find(node=>node.classList?.contains('hsn-calendar-more'));
+  if(events.length<=MAX_VISIBLE){
+   events.forEach(item=>item.hidden=false);
+   if(more)more.remove();
+   delete day.dataset.hsnExpanded;
+   return;
+  }
+  if(!more){
+   more=document.createElement('button');more.type='button';more.className='hsn-calendar-more';
+   more.setAttribute('aria-expanded','false');
+   more.addEventListener('click',()=>{
+    day.dataset.hsnExpanded=day.dataset.hsnExpanded==='1'?'0':'1';
+    updateDay(day);
+   });
+   day.insertBefore(more,events[0]);
+  }
+  const expanded=day.dataset.hsnExpanded==='1';
+  for(let i=0;i<events.length;i++)events[i].hidden=!expanded&&i>=MAX_VISIBLE;
+  more.textContent=expanded?'Mostrar menos':'+'+(events.length-MAX_VISIBLE)+' lançamento(s)';
+  more.setAttribute('aria-expanded',String(expanded));
+ }
+ let queued=false;
+ function update(){queued=false;board.querySelectorAll('.calendar-grid .day[data-date]').forEach(updateDay);}
+ function enqueue(){if(queued)return;queued=true;queueMicrotask(update);}
+ const observer=new MutationObserver(mutations=>{
+  const changed=mutations.some(m=>Array.from(m.addedNodes).some(node=>node.nodeType===1 &&
+   (node.matches?.('.calendar-grid,.day,.calendar-event') || node.querySelector?.('.calendar-event'))));
+  if(changed)enqueue();
+ });
+ observer.observe(board,{childList:true,subtree:true});
+ enqueue();
+}
+initializeCompactCalendar();
 init();
