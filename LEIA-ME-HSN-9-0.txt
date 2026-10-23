@@ -1,0 +1,65 @@
+FINANCEIRO HSN 9.0 — CENTRAL, CONCILIAÇÃO, AGENDA E DDA
+========================================================
+Base: pacote HSN 8.9 completo + correção 8.9.2 (calendário e avisos).
+Esta versão foi preparada para o repositório de TESTE, sem alterações no Supabase.
+
+NOVAS ÁREAS
+1. Dia a dia > Central de aprovação:
+   - filtros por assinatura, programação e autorização;
+   - seleção múltipla e alteração de etapa usando confirmação existente;
+   - etapas registradas no HSN não equivalem a uma autorização bancária.
+2. Dia a dia > Conciliação bancária:
+   - leitura local de extrato OFX ou CSV (até 5 MB);
+   - sugestões de contas por valor exato, data e descrição;
+   - revisão individual ou em lote para movimentos do MESMO dia;
+   - uso do formulário de baixa já existente, com data do extrato sugerida;
+   - NENHUMA transação ou baixa automática ao carregar arquivo;
+   - extrato não é enviado ao servidor, nem salvo por esta nova funcionalidade.
+   - arquivos CSV variam entre bancos: se as colunas não forem identificadas,
+     a tela informa o problema sem importar dados.
+3. Dia a dia > Agenda de pagamentos:
+   - vencimentos por dia e por horizonte 7/15/30/60 dias ou todos;
+   - visão de vencidas, programadas e assinaturas pendentes;
+   - seleção por dia ou entre dias e alteração de etapa em lote.
+4. Dia a dia > DDA:
+   - ordenação padrão do vencimento mais próximo para o mais distante;
+   - opções de ordenar por vencimento decrescente ou fornecedor;
+   - botão Ver todos os vencimentos, além do filtro mensal;
+   - aviso de possível conta já existente (documento ou fornecedor+valor+data),
+     com atalho para revisão da conta antes de converter.
+   - A vinculação e a conversão efetivas continuam usando o fluxo seguro original.
+
+ARQUIVOS ALTERADOS / ADICIONADOS
+- index.html
+- service-worker.js
+- js/app.js
+- js/finance.js
+- js/phase4.js
+- js/hsn90-modules.js [NOVO]
+- css/hsn90-modules.css [NOVO]
+
+INSTALAÇÃO
+1. Faça backup do repositório de teste antes de substituir arquivos.
+2. Use o ZIP completo para substituir os arquivos da versão de teste anterior.
+   Extraia e envie o conteúdo da pasta à raiz do repositório GitHub.
+3. Se o repositório já está na 8.9.2, pode aplicar somente o pacote de
+   atualização rápida, preservando as pastas css/ e js/.
+4. Atualize o site após a publicação (Ctrl + Shift + R).
+5. Teste menu, dados reais somente para leitura, filtros, ordenação do DDA,
+   extrato de TESTE e formulário de baixa SEM confirmar alterações.
+6. Teste aprovações e pagamentos reais somente após verificar no Sicoob.
+
+SEGURANÇA E LIMITES
+- Não exige SQL novo, não modifica tabelas, RLS, permissões ou integrações.
+- Não conecta automaticamente à conta bancária; não emite PIX/TED e não
+  assina pagamentos pelo diretor. A conciliação é por extrato importado.
+- Não salva nem transmite o conteúdo do OFX/CSV para o Supabase.
+- Recomendações de correspondência precisam de revisão humana.
+- Não foram testados login, escrita de dados nem pagamentos no Supabase real.
+- Testados: sintaxe JS, consistência de assets, parsing CSV/OFX, algoritmo
+  de correspondência e restrições de contas ainda pendentes de assinatura.
+- O ambiente não permitiu abrir o Chromium de forma confiável; revisar
+  interface de desktop e celular no GitHub Pages de TESTE antes de produção.
+
+ROLLBACK
+Reinstale o backup do HSN 8.9.2. Este pacote não altera dados do banco.

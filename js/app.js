@@ -1,7 +1,7 @@
 /* Financeiro HSN · Fase 3. Contas e comissões permanecem separadas. */
 'use strict';
 const $=id=>document.getElementById(id);
-const titles={dashboard:'Seu painel',suppliers:'Fornecedores',account_types:'Tipos de conta',message_templates:'Mensagens prontas',payables:'Contas a pagar',recurring_models:'Contas recorrentes',calendar:'Calendário',local_holidays:'Feriados locais',alerts:'Alertas de contas',commissions:'Comissões',commission_alerts:'Alertas de comissões',alert_settings:'Configurações de alertas',dda:'DDA',imports:'Importar / exportar',reports:'Relatórios',cash_forecast:'Previsão de caixa',audit:'Histórico de alterações',adjustments:'Reajustes de contrato',backups:'Backups',push:'Notificações no telefone',zoho_connect:'Conexão Zoho Mail',sicoob_collections:'Cobranças Sicoob'};
+const titles={approvals:'Central de aprovação',reconciliation:'Conciliação bancária',payments_agenda:'Agenda de pagamentos',dashboard:'Seu painel',suppliers:'Fornecedores',account_types:'Tipos de conta',message_templates:'Mensagens prontas',payables:'Contas a pagar',recurring_models:'Contas recorrentes',calendar:'Calendário',local_holidays:'Feriados locais',alerts:'Alertas de contas',commissions:'Comissões',commission_alerts:'Alertas de comissões',alert_settings:'Configurações de alertas',dda:'DDA',imports:'Importar / exportar',reports:'Relatórios',cash_forecast:'Previsão de caixa',audit:'Histórico de alterações',adjustments:'Reajustes de contrato',backups:'Backups',push:'Notificações no telefone',zoho_connect:'Conexão Zoho Mail',sicoob_collections:'Cobranças Sicoob'};
 
 /* Sugestões opcionais; usuários escolhem quais cadastrar. Nunca renomeia tipos existentes. */
 const recommendedTypes=[

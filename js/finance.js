@@ -22,14 +22,14 @@ let data={payables:[],models:[],suppliers:[],types:[],holidays:[],documents:[]};
 let month='',statusFilter='',workflowFilter='',typeFilter='',calendarMode='month',showArchived=false,kind='payables',version=0;
 let workflowSupported=null,financeSnapshotInFlight=null;const selectedPayables=new Set();const selectedRecurring=new Set();
 let selected=null,editingRecord=null,editingTable='',preview=[],previewMonth='',pendingUpload=null;
-const handles=v=>['dashboard','payables','recurring_models','calendar','local_holidays'].includes(v)||HSN_PHASE3.handles(v)||HSN_PHASE4.handles(v)||HSN_PHASE5.handles(v)||HSN_PUSH.handles(v);
+const handles=v=>['approvals','reconciliation','payments_agenda','dashboard','payables','recurring_models','calendar','local_holidays'].includes(v)||HSN_PHASE3.handles(v)||HSN_PHASE4.handles(v)||HSN_PHASE5.handles(v)||HSN_PUSH.handles(v);
 const byId=(list,id)=>list.find(r=>r.id===id);
 const supplier=p=>byId(data.suppliers,p.supplier_id);
 const type=p=>byId(data.types,p.type_id);
 const amount=p=>p.actual_amount===null||p.actual_amount===undefined?p.estimated_amount:p.actual_amount;
 const docs=p=>data.documents.filter(d=>d.payable_id===p.id);
 const missing=p=>(p.required_documents||[]).filter(t=>!docs(p).some(d=>d.document_type===t));
-function reset(){selectedPayables.clear();selectedRecurring.clear();workflowFilter='';workflowSupported=null;financeSnapshotInFlight=null;HSN_PUSH.reset();HSN_PHASE5.reset();HSN_PHASE4.reset();HSN_DOCUMENT_READING.reset();HSN_ATTACHMENTS.reset();HSN_PHASE3.reset();version++;data={payables:[],models:[],suppliers:[],types:[],holidays:[],documents:[]};selected=null;editingRecord=null;pendingUpload=null;preview=[];document.getElementById('summary')?.replaceChildren();document.getElementById('calendar-board')?.replaceChildren();document.getElementById('finance-controls')?.replaceChildren();for(const id of ['finance-dialog','documents-dialog','preview-dialog'])document.getElementById(id)?.close();document.getElementById('finance-fields')?.replaceChildren();document.getElementById('document-list')?.replaceChildren();document.getElementById('preview-list')?.replaceChildren();}
+function reset(){selectedPayables.clear();selectedRecurring.clear();workflowFilter='';workflowSupported=null;financeSnapshotInFlight=null;HSN_PUSH.reset();window.HSN90?.reset?.();HSN_PHASE5.reset();HSN_PHASE4.reset();HSN_DOCUMENT_READING.reset();HSN_ATTACHMENTS.reset();HSN_PHASE3.reset();version++;data={payables:[],models:[],suppliers:[],types:[],holidays:[],documents:[]};selected=null;editingRecord=null;pendingUpload=null;preview=[];document.getElementById('summary')?.replaceChildren();document.getElementById('calendar-board')?.replaceChildren();document.getElementById('finance-controls')?.replaceChildren();for(const id of ['finance-dialog','documents-dialog','preview-dialog'])document.getElementById(id)?.close();document.getElementById('finance-fields')?.replaceChildren();document.getElementById('document-list')?.replaceChildren();document.getElementById('preview-list')?.replaceChildren();}
 async function all(table,order='created_at'){let result=[];for(let offset=0;;offset+=1000){const batch=check(await db.from(table).select('*').order(order).order('id').range(offset,offset+999));result.push(...batch);if(batch.length<1000)break;}return result;}
 // Compartilha apenas consultas SIMULTANEAS; depois de concluidas, a proxima navegacao
 // busca dados novos. Nao utiliza cache financeiro persistente ou por tempo.
@@ -98,7 +98,7 @@ function filterControls(){const controls=$('finance-controls');controls.replaceC
 function filtered(){if(kind==='calendar'&&['commissions','dda'].includes(HSN_PHASE3.getCalendarModule()))return [];const search=$('search').value.toLocaleLowerCase('pt-BR');return data.payables.filter(p=>p.archived===(kind==='calendar'?false:showArchived)).filter(p=>(kind==='calendar'?p.due_date.slice(0,7):p.competence.slice(0,7))===month).filter(p=>!statusFilter||D().status(p)===statusFilter).filter(p=>kind!=='payables'||!workflowFilter||workflowStage(p)===workflowFilter).filter(p=>!typeFilter||p.type_id===typeFilter).filter(p=>[p.title,supplier(p)?.legal_name,supplier(p)?.trade_name,type(p)?.name,p.document_number].join(' ').toLocaleLowerCase('pt-BR').includes(search)).sort((a,b)=>a.due_date.localeCompare(b.due_date)||a.title.localeCompare(b.title));}
 function stat(title,value,description,cls=''){const card=el('div',undefined,'stat '+cls);card.append(el('small',title),el('strong',money(value)),el('span',description,'muted'));$('summary').append(card);}
 function renderFinance(){HSN_THEME.describe(view);if(!handles(view))return;kind=view;HSN_PHASE3.clearCalendar();
- if(kind==='dashboard')return renderDashboard();if(HSN_PUSH.handles(view))return HSN_PUSH.render();if(HSN_PHASE5.handles(view))return HSN_PHASE5.render();if(HSN_PHASE4.handles(view))return HSN_PHASE4.render();$('new').hidden=false;if(HSN_PHASE3.handles(view))return HSN_PHASE3.render();$('view-title').textContent=titles[kind];$('new').textContent=kind==='calendar'?'Nova conta':'Novo cadastro';document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===kind));$('records').replaceChildren();$('calendar-board').replaceChildren();$('summary').replaceChildren();filterControls();
+ if(window.HSN90?.handles(kind))return HSN90.render(kind);if(kind==='dashboard')return renderDashboard();if(HSN_PUSH.handles(view))return HSN_PUSH.render();if(HSN_PHASE5.handles(view))return HSN_PHASE5.render();if(HSN_PHASE4.handles(view))return HSN_PHASE4.render();$('new').hidden=false;if(HSN_PHASE3.handles(view))return HSN_PHASE3.render();$('view-title').textContent=titles[kind];$('new').textContent=kind==='calendar'?'Nova conta':'Novo cadastro';document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===kind));$('records').replaceChildren();$('calendar-board').replaceChildren();$('summary').replaceChildren();filterControls();
  if(['payables','calendar'].includes(kind)){
  const list=filtered(),open=list.filter(stageIsOpen),paid=list.filter(p=>p.payment_status==='paid'),today=list.filter(p=>stageIsOpen(p)&&D().status(p)==='today'),late=list.filter(p=>stageIsOpen(p)&&D().status(p)==='overdue');const sum=arr=>arr.reduce((total,p)=>total+Number(amount(p)),0);
  stat('Pendente · contas',sum(open),open.length+' contas');stat('Pago · contas',sum(paid),paid.length+' contas','green');stat('Hoje · contas',sum(today),today.length+' contas','orange');stat('Vencido · contas',sum(late),late.length+' contas','red');
@@ -200,7 +200,7 @@ function paymentAudit(p,paidOn,amountValue,source,reason,hasReceipt){
  if(notes.length+audit.length+1<=2000)return {notes:(notes?notes+'\n':'')+audit,workflow_updated_at:when};
  throw Error('O histórico de observações atingiu o limite. Abra a conta e libere espaço antes da baixa.');
 }
-async function bulkMarkPaid(items){
+async function bulkMarkPaid(items,defaults={}){
  if(busy)return;
  const unique=[...new Map(items.map(p=>[p.id,p])).values()];
  const eligible=unique.filter(p=>!paymentBlockReason(p));
@@ -212,13 +212,14 @@ async function bulkMarkPaid(items){
  const total=eligible.reduce((n,p)=>n+Number(amount(p)),0);
  form.append(el('strong','Total apresentado: '+money(total),'hsn88-total'));
  if(rejected.length){const skipped=el('details',undefined,'hsn88-skipped');skipped.append(el('summary',rejected.length+' conta(s) não serão alteradas'));for(const p of rejected)skipped.append(el('p',p.title+': '+paymentBlockReason(p)));form.append(skipped);}
- const dateLabel=el('label','Data efetiva do pagamento (para todas)');const date=el('input');date.type='date';date.required=true;date.value=D().today();dateLabel.append(date);form.append(dateLabel);
+ const dateLabel=el('label','Data efetiva do pagamento (para todas)');const date=el('input');date.type='date';date.required=true;date.value=defaults.date||D().today();dateLabel.append(date);form.append(dateLabel);
  const evidenceLabel=el('label','Como o pagamento foi confirmado?');const evidence=el('select');evidence.required=true;for(const [id,text]of [['','Selecione a origem'],['bank_statement','Extrato ou consulta bancária'],['director_confirmation','Confirmação do diretor'],['manual_check','Conferência administrativa']])evidence.append(new Option(text,id));evidenceLabel.append(evidence);form.append(evidenceLabel);
+ if(defaults.reference){evidence.value='bank_statement';}
  const lacking=eligible.filter(p=>!docs(p).some(d=>d.document_type==='comprovante'));
  if(lacking.length){
   const warning=el('p',lacking.length+' conta(s) sem comprovante anexado. O comprovante é OPCIONAL, mas o pagamento precisa ter sido confirmado por outra fonte. A falta ficará registrada no histórico.','hsn88-missing-proof');form.append(warning);
  }
- const noteLabel=el('label','Observação da confirmação (obrigatória para baixas sem comprovante)');const note=el('textarea');note.rows=2;note.maxLength=300;note.placeholder='Ex.: diretor confirmou a execução no Sicoob em 22/10';noteLabel.append(note);form.append(noteLabel);
+ const noteLabel=el('label','Observação da confirmação (obrigatória para baixas sem comprovante)');const note=el('textarea');note.rows=2;note.maxLength=300;note.placeholder='Ex.: diretor confirmou a execução no Sicoob em 22/10';if(defaults.reference)note.value='Conferido no extrato bancário, referência '+String(defaults.reference).slice(0,120);noteLabel.append(note);form.append(noteLabel);
  const entries=el('div',undefined,'hsn88-paid-entries');const rowValues=new Map();
  for(const p of eligible){
   const row=el('div',undefined,'hsn88-paid-row');const description=el('div');description.append(el('strong',p.title),el('small',supplier(p)?.trade_name||supplier(p)?.legal_name||'Fornecedor não informado'));
@@ -379,5 +380,5 @@ async function uploadDocument(event){event.preventDefault();if(HSN_DOCUMENT_READ
  HSN_ATTACHMENTS.reset();notice('Documento adicionado. Versões anteriores preservadas.');await loadFinance(view);renderDocuments();if(meta.document_type==='comprovante'){const refreshed=data.payables.find(r=>r.id===p.id);if(refreshed)setTimeout(()=>HSN_PHASE3.suggestPaid(refreshed),0);}});}
 function wire(){ $('finance-form').onsubmit=saveFinance;$('finance-close').onclick=()=>{if(!busy)$('finance-dialog').close();};$('documents-close').onclick=()=>{if(!busy){$('documents-dialog').close();HSN_ATTACHMENTS.reset();selected=null;}};$('preview-close').onclick=()=>{if(!busy)$('preview-dialog').close();};$('preview-confirm').onclick=confirmGeneration;$('document-upload').onsubmit=uploadDocument;for(const id of ['finance-dialog','documents-dialog','preview-dialog'])$(id).addEventListener('cancel',e=>{if(busy)e.preventDefault();}); }
 document.addEventListener('DOMContentLoaded',wire);
-root.HSN_FINANCE={bulkPaid:bulkMarkPaid,selectedAccount:()=>selected,accountById:id=>data.payables.find(p=>p.id===id),openDocuments,handles,load:loadFinance,render:renderFinance,editor,reset,all,markPaid,activate:(v,m)=>{kind=v;if(m)month=m;}};
+root.HSN_FINANCE={snapshot:()=>data,workflowBulk:editWorkflow,openRecord:id=>{const p=byId(data.payables,id);if(!p)return;kind='payables';view='payables';month=p.competence.slice(0,7);renderFinance();editor(p);},navigate:goModule,bulkPaid:bulkMarkPaid,selectedAccount:()=>selected,accountById:id=>data.payables.find(p=>p.id===id),openDocuments,handles,load:loadFinance,render:renderFinance,editor,reset,all,markPaid,activate:(v,m)=>{kind=v;if(m)month=m;}};
 })(window);

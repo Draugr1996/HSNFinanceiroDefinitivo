@@ -1,0 +1,71 @@
+/* Financeiro HSN 9.0: extensão incremental. Paleta, barra lateral e tipografia
+   continuam vindo do tema HSN 8.9.2. */
+#records .hsn90-note,#records .hsn90-agenda-group,#records .hsn90-toolbar,
+#records .hsn90-table-wrap,#records .hsn90-reconcile-summary {
+ grid-column:1/-1;min-width:0;
+}
+#records .hsn90-toolbar {display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap;
+ padding:16px 18px;border-radius:14px;background:var(--surface);border:1px solid var(--line)}
+.hsn90-toolbar strong{display:block;font-size:14px;color:var(--ink)}
+.hsn90-toolbar small{display:block;font-size:12px;color:var(--muted);margin-top:4px}
+.hsn90-toolbar-actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+.hsn90-toolbar-actions button{min-height:36px;font-size:12px;padding:8px 12px}
+.hsn90-note{border:1px solid var(--line);border-left:3px solid var(--accent);
+ border-radius:12px;padding:14px 17px;color:var(--ink);background:var(--surface2)}
+.hsn90-note strong{font-size:13px}
+.hsn90-note p{font-size:12px;margin:4px 0 0;color:var(--muted)}
+.hsn90-table-wrap{width:100%;max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain;
+ border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.hsn90-table{border-collapse:collapse;width:100%;min-width:780px;font-size:12px;color:var(--ink)}
+.hsn90-table thead{background:var(--surface2)}
+.hsn90-table th{white-space:nowrap;font-size:11px;text-align:left;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+.hsn90-table th,.hsn90-table td{padding:13px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+.hsn90-table tbody tr:last-child td{border-bottom:0}
+.hsn90-table td strong{display:block;line-height:1.35}
+.hsn90-table td small{display:block;color:var(--muted);font-size:11px;line-height:1.45;margin-top:4px}
+.hsn90-table td .hsn90-money{white-space:nowrap}
+.hsn90-table .hsn86-checkbox{width:17px;min-height:17px;height:17px;margin:0;accent-color:var(--accent)}
+.hsn90-table button{white-space:nowrap;padding:7px 11px;min-height:34px;font-size:11px}
+.hsn90-table td:last-child button+button{margin-left:5px}
+.hsn90-table tr.hsn90-selected{background:var(--accent-soft)}
+.hsn90-chip{display:inline-block;border-radius:8px;padding:5px 8px;max-width:180px;line-height:1.35;
+ font-size:11px;font-weight:700;color:var(--muted);background:var(--surface3)}
+.hsn90-chip-awaiting_signature,.hsn90-chip-scheduled_signature{background:var(--amber-soft);color:var(--amber)}
+.hsn90-chip-scheduled{background:var(--surface3);color:var(--ink)}
+.hsn90-chip-approved,.hsn90-chip-paid{background:var(--green-soft);color:var(--green)}
+.hsn90-chip-cancelled{background:var(--red-soft);color:var(--red)}
+.hsn90-agenda-group{border:1px solid var(--line);border-radius:15px;background:var(--surface);
+ padding:14px;display:flex;flex-direction:column;gap:10px}
+.hsn90-agenda-header{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.hsn90-agenda-header h3{font-size:15px;flex:1;min-width:145px;margin:0}
+.hsn90-agenda-header strong{font-size:17px;white-space:nowrap}
+.hsn90-agenda-header span{color:var(--muted);font-size:12px}
+.hsn90-agenda-header button{font-size:11px;min-height:34px;padding:6px 10px}
+.hsn90-agenda-group .hsn90-table-wrap{margin:0}
+.hsn90-reconcile-summary{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;
+ background:var(--surface2);border:1px solid var(--line);padding:13px 16px;border-radius:12px}
+.hsn90-reconcile-summary span,.hsn90-hint{font-size:12px;color:var(--muted)}
+.hsn90-error{grid-column:1/-1;color:var(--red);background:var(--red-soft);border-radius:10px;padding:12px}
+.hsn90-empty{grid-column:1/-1;color:var(--muted);padding:12px}
+.hsn90-check{display:flex!important;gap:8px;align-items:center!important;min-width:240px!important;font-size:12px!important}
+.hsn90-check input{width:17px;min-width:17px;height:17px;min-height:17px;margin:0}
+.hsn90-dda-existing{border:1px solid var(--line);border-left:3px solid var(--amber);
+ border-radius:10px;background:var(--surface2);padding:12px;margin:9px 0;display:flex;flex-direction:column;gap:6px}
+.hsn90-dda-existing strong{font-size:12px;color:var(--ink)}
+.hsn90-dda-existing p{font-size:11px!important;margin:0!important;color:var(--muted)!important}
+.hsn90-dda-existing button{font-size:11px;min-height:32px;background:var(--surface);color:var(--ink);border:1px solid var(--line);text-align:left;padding:5px 10px;white-space:normal}
+.hsn90-stat strong{font-size:clamp(16px,1.7vw,24px)!important;overflow-wrap:anywhere}
+.hsn90-micro{display:block;font-size:10px;color:var(--muted);margin-top:5px;white-space:normal}
+@media(max-width:800px){.hsn90-table{min-width:675px}.hsn90-toolbar{align-items:stretch!important}.hsn90-toolbar-actions{width:100%}}
+@media(max-width:600px){
+ #records .hsn90-toolbar{padding:12px;gap:10px}
+ .hsn90-toolbar-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+ .hsn90-toolbar-actions button{white-space:normal;line-height:1.3;min-height:40px;padding:8px}
+ .hsn90-table{min-width:680px}
+ .hsn90-table th,.hsn90-table td{padding:10px 9px}
+ .hsn90-agenda-group{padding:10px}
+ .hsn90-agenda-header h3{width:100%}
+ .hsn90-stat strong{font-size:18px!important}
+}
+
+#records>h3,#records>.hsn90-hint{grid-column:1/-1}

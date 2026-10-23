@@ -8,7 +8,7 @@ const state=c=>c.converted_payable_id?(linkedAccount(c)?.payment_status==='paid'
 const stateNames={unchecked:'Não conferida',checked:'Conferida',converted:'Convertida em conta',paid:'Paga (conta vinculada)'};
 // Seleção em lote restrita aos boletos visíveis na tela DDA.
 const selectedDdaIds=new Set();
-let lastDdaView=false;
+let lastDdaView=false,ddaSort='due_asc',ddaAllMonths=false;
 const handles=v=>['dda','imports','reports'].includes(v);
 function requests(all){return [all('dda_charges')];}
 function receive(snapshot,rows){data=snapshot;dda=rows||[];const available=new Set(dda.map(c=>c.id));for(const id of selectedDdaIds)if(!available.has(id))selectedDdaIds.delete(id);ddaMonth ||= D().today().slice(0,7);reportStart ||= D().today().slice(0,7)+'-01';reportEnd ||= D().monthDay(reportStart.slice(0,7),31);}
@@ -103,6 +103,7 @@ function ddaCard(c,selectable=false){
   pick.append(checkBox,el('span','Selecionar'));card.append(pick);
   card.classList.toggle('dda-selected',checkBox.checked);
  }
+ if(window.HSN90?.appendDdaReview)HSN90.appendDdaReview(card,c);
  card.append(el('span','DDA','pill dda-pill'),el('span',stateNames[state(c)],'pill dda-pill'),el('h2',c.title),el('p',c.supplier_name+(c.tax_id?' · '+c.tax_id:'')),el('p','Vencimento '+D().br(c.due_date)),el('div',money(c.amount),'money'));
  const actions=el('div',undefined,'actions');
  if(!c.converted_payable_id){actions.append(button('Editar',()=>openDda(c)));if(!c.reviewed)actions.append(button('Conferir',()=>reviewDda(c),'dda-button'));if(c.reviewed)actions.append(button('Converter em conta',()=>convertForm(c),'dda-button'));}
@@ -112,7 +113,7 @@ function ddaCard(c,selectable=false){
 }
 function visibleDdaRows(){
  const term=$('search').value.toLocaleLowerCase('pt-BR');
- return dda.filter(c=>c.archived===archiveFilter&&c.due_date.slice(0,7)===ddaMonth&&(!ddaStatus||state(c)===ddaStatus)&&[c.title,c.supplier_name,c.tax_id,c.document_number].join(' ').toLocaleLowerCase('pt-BR').includes(term));
+ return dda.filter(c=>c.archived===archiveFilter&&(ddaAllMonths||c.due_date.slice(0,7)===ddaMonth)&&(!ddaStatus||state(c)===ddaStatus)&&[c.title,c.supplier_name,c.tax_id,c.document_number].join(' ').toLocaleLowerCase('pt-BR').includes(term)).sort((a,b)=>ddaSort==='due_desc'?b.due_date.localeCompare(a.due_date)||a.title.localeCompare(b.title):ddaSort==='supplier'?a.supplier_name.localeCompare(b.supplier_name,'pt-BR')||a.due_date.localeCompare(b.due_date):a.due_date.localeCompare(b.due_date)||a.title.localeCompare(b.title));
 }
 function selectedVisibleDda(){return visibleDdaRows().filter(c=>selectedDdaIds.has(c.id));}
 function updateDdaSelectionUi(){
@@ -158,9 +159,11 @@ function ddaSelectionToolbar(list){
 function renderDda(){
  const controls=$('finance-controls');
  const month=field4(controls,'dda_month','Mês do vencimento',ddaMonth,'month',true);
- month.onchange=()=>{if(month.value){selectedDdaIds.clear();ddaMonth=month.value;render();}};
+ month.onchange=()=>{if(month.value){selectedDdaIds.clear();ddaMonth=month.value;ddaAllMonths=false;render();}};
+ controls.append(button(ddaAllMonths?'Exibir apenas o mês':'Ver todos os vencimentos',()=>{ddaAllMonths=!ddaAllMonths;selectedDdaIds.clear();render();}));
  const status=select4(controls,'dda_state','Conferência',[['','Todas'],...Object.entries(stateNames)],ddaStatus);
  status.onchange=()=>{selectedDdaIds.clear();ddaStatus=status.value;render();};
+ const order=select4(controls,'dda_order','Ordenar DDA',[['due_asc','Vencimento mais próximo'],['due_desc','Vencimento mais distante'],['supplier','Fornecedor (A–Z)']],ddaSort);order.onchange=()=>{ddaSort=order.value;render();};
  const archived=select4(controls,'dda_archived','Exibição',[['active','Ativas'],['archived','Arquivadas']],archiveFilter?'archived':'active');
  archived.onchange=()=>{selectedDdaIds.clear();archiveFilter=archived.value==='archived';render();};
  controls.append(button('Importar DDA',()=>{selectedDdaIds.clear();view='imports';importModule='dda';render();}));
@@ -636,5 +639,5 @@ function calendarEvents(month){return dda.filter(c=>!c.archived&&!c.converted_pa
 function calendar(month,mode){const module=HSN_PHASE3.getCalendarModule();if(!['all','dda'].includes(module))return;const events=calendarEvents(month);const section=el('section',undefined,'card full-width dda-card');section.append(el('h3','◆ DDA · '+events.length+' cobrança(s) sem conversão'),el('p','Convertidas não aparecem como novo compromisso DDA; a conta vinculada aparece no calendário de contas. Nenhum total é somado.','muted'));if(mode==='month'){for(const c of events){const cell=document.querySelector('.day[data-date="'+c.due_date+'"]');if(cell)cell.append(button('◆ '+c.title+' · '+money(c.amount),()=>openDda(c),'calendar-event dda-event'));}$('commission-calendar-summary').append(section);}else{$('records').append(section);events.forEach(c=>$('records').append(ddaCard(c)));}}
 function wire(){$('phase4-form').onsubmit=saveForm;$('phase4-close').onclick=()=>{if(!busy)$('phase4-dialog').close();};$('import-close').onclick=()=>{if(!busy)$('import-dialog').close();};$('import-confirm').onclick=confirmImport;for(const id of ['phase4-dialog','import-dialog'])$(id).addEventListener('cancel',e=>{if(busy)e.preventDefault();});}
 document.addEventListener('DOMContentLoaded',wire);
-root.HSN_PHASE4={handles,requests,receive,reset,render,editor,addAlerts,calendar};
+root.HSN_PHASE4={handles,requests,receive,reset,render,editor,addAlerts,calendar,charges:()=>dda};
 })(window);
