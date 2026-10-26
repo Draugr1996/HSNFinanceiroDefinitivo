@@ -85,7 +85,7 @@ function filterControls(){const controls=$('finance-controls');controls.replaceC
   steps.onchange=()=>{workflowFilter=steps.value;renderFinance();};
  }
  const ty=selectField(controls,'filter_type','Tipo',[['','Todos os tipos'],...data.types.map(t=>[t.id,t.name])],typeFilter);ty.onchange=()=>{typeFilter=ty.value;renderFinance();};
- if(kind==='payables'){controls.append(button('Fornecedores',()=>openFinanceRegistration('suppliers')));controls.append(button('Gerenciar tipos',()=>openFinanceRegistration('account_types')));controls.append(button('Importar pagamentos CSV',()=>openFinanceRegistration('imports')));}
+ if(kind==='payables'){controls.append(button('Fornecedores',()=>openFinanceRegistration('suppliers')));controls.append(button('Gerenciar tipos',()=>openFinanceRegistration('account_types')));controls.append(button('Verificar duplicidades',reviewPayableDuplicates,'secondary'));controls.append(button('Importar pagamentos CSV',()=>openFinanceRegistration('imports')));}
  if(kind==='calendar'){
  const mode=selectField(controls,'calendar_mode','Visualização',[['month','Mês'],['list','Lista']],calendarMode);mode.onchange=()=>{calendarMode=mode.value;renderFinance();};
  const moduleSelect=selectField(controls,'module','Módulo',HSN_PHASE3.calendarOptions(),HSN_PHASE3.getCalendarModule());moduleSelect.onchange=()=>HSN_PHASE3.setCalendarModule(moduleSelect.value);
@@ -94,6 +94,52 @@ function filterControls(){const controls=$('finance-controls');controls.replaceC
  if(kind==='recurring_models'){
  const m=inputField(controls,'generate_month','Gerar competência',month,'month',true);m.onchange=()=>{month=m.value;};controls.append(button('Conferir e gerar mês',prepareGeneration,'primary'));hint(controls,'O app calcula vencimento e média. Você confere e confirma; nenhum valor real ou pagamento é lançado sozinho.');
  }
+}
+/* Auditoria geral SOMENTE LEITURA: não arquiva, não paga, não altera vínculos.
+ * Considera todas as competências, não apenas a filtrada na tela. */
+function reviewPayableDuplicates(){
+ const rows=data.payables.filter(p=>!p.archived);
+ const byDueValue=new Map(),byDoc=new Map(),byBarcode=new Map();const pairs=[],seen=new Set();
+ function add(a,b,reason){if(!a||!b||a.id===b.id)return;const key=[a.id,b.id].sort().join('|');if(seen.has(key))return;seen.add(key);
+   const hits=HSN_IMPORT_RULES.suspects(a,[b],data.suppliers);
+   const level=hits.some(h=>h.risk==='block')?'Forte indício':'Conferir manualmente';
+   pairs.push({a,b,level,reason:hits[0]?.reasons.join(', ')||reason});}
+ for(const p of rows){
+  const value=Number(p.actual_amount??p.estimated_amount??0),amount=Math.round(value*100);
+  if(amount>0){const key=[p.original_due_date||p.due_date,amount].join('|');
+   const group=byDueValue.get(key)||[];
+   for(const q of group)add(q,p,'Mesmo vencimento e valor — fornecedores podem ser diferentes');
+   group.push(p);byDueValue.set(key,group);
+  }
+  const doc=HSN_IMPORT_RULES.normalize(p.document_number);
+  if(doc.length>=5){const old=byDoc.get(doc)||[];for(const q of old)add(q,p,'Mesmo número de documento');old.push(p);byDoc.set(doc,old);}
+  const barcode=String(p.barcode||'').replace(/\D/g,'');if(barcode.length>=40){const old=byBarcode.get(barcode)||[];for(const q of old)add(q,p,'Mesma linha digitável');old.push(p);byBarcode.set(barcode,old);}
+ }
+ pairs.sort((a,b)=>(a.level===b.level?0:a.level==='Forte indício'?-1:1)||a.a.due_date.localeCompare(b.a.due_date));
+ let dialog=document.getElementById('hsn91-duplicate-dialog');if(!dialog){dialog=el('dialog');dialog.id='hsn91-duplicate-dialog';dialog.className='hsn91-audit-dialog';document.body.append(dialog);}
+ dialog.replaceChildren();const top=el('div',undefined,'topline');top.append(el('h2','Conferência de duplicidades'));
+ const actions=el('div',undefined,'actions');
+ const exportBtn=button('Exportar relatório CSV',()=>{
+  const quote=value=>{let s=String(value??'');if(/^[=+@-]/.test(s.trim()))s="'"+s;return '"'+s.replaceAll('"','""')+'"';};
+  const columns=['Prioridade','Fornecedor A','ID A','Documento A','Fornecedor B','ID B','Documento B','Vencimento','Valor A','Valor B','Vínculo DDA A','Vínculo DDA B','Anexos A','Anexos B','Motivo'];
+  const csv=[columns,...pairs.map(x=>[x.level,x.a.title,x.a.id,x.a.document_number,x.b.title,x.b.id,x.b.document_number,x.a.due_date,x.a.actual_amount??x.a.estimated_amount,x.b.actual_amount??x.b.estimated_amount,(window.HSN_PHASE4?.charges?.()||[]).filter(c=>c.converted_payable_id===x.a.id).length,(window.HSN_PHASE4?.charges?.()||[]).filter(c=>c.converted_payable_id===x.b.id).length,data.documents.filter(d=>d.payable_id===x.a.id).length,data.documents.filter(d=>d.payable_id===x.b.id).length,x.reason])].map(r=>r.map(quote).join(';')).join('\r\n');
+  const url=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));
+  const a=document.createElement('a');a.href=url;a.download='HSN-conferencia-duplicidades.csv';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);
+ },'secondary');exportBtn.disabled=!pairs.length;actions.append(exportBtn,button('Fechar',()=>dialog.close(),'secondary'));top.append(actions);dialog.append(top);
+ dialog.append(el('p',pairs.length+' par(es) com coincidência. '+pairs.filter(x=>x.level==='Forte indício').length+' com indício forte. Nenhuma conta será alterada.','hint'));
+ dialog.append(el('p','Mesmo valor e vencimento NÃO provam duplicidade. Confira documentos, fornecedor e vínculo DDA antes de arquivar. A conferência considera TODAS as competências ativas e nunca exclui ou arquiva automaticamente.','muted'));
+ const wrap=el('div',undefined,'hsn91-audit-scroller');const table=el('table',undefined,'account-table');
+ const th=el('thead'),tr=el('tr');['Indício','Conta A','Conta B','Vencimento / valor','Motivo','Abrir contas'].forEach(v=>tr.append(el('th',v)));th.append(tr);table.append(th);
+ const body=el('tbody');for(const x of pairs.slice(0,250)){
+  const row=el('tr');row.append(el('td',x.level));
+  for(const p of [x.a,x.b]){const td=el('td');td.append(el('strong',p.title),el('small',(p.document_number||'Sem documento')+' · '+(p.payment_status==='paid'?'Paga':'Em aberto')+' · '+p.id.slice(0,8)));row.append(td);}
+  const val=Number(x.a.actual_amount??x.a.estimated_amount??0);row.append(el('td',HSN_DATES.br(x.a.due_date)+' · '+money(val)));row.append(el('td',x.reason));
+  const td=el('td');for(const p of [x.a,x.b])td.append(button('Abrir '+p.id.slice(0,6),()=>{dialog.close();HSN_FINANCE.openRecord(p.id);},'secondary'));row.append(td);body.append(row);
+ }
+ table.append(body);wrap.append(table);dialog.append(wrap);
+ if(pairs.length>250)dialog.append(el('p','Exibindo os primeiros 250 pares. Utilize o relatório SQL para uma auditoria completa.','hint'));
+ if(!pairs.length)dialog.append(el('p','Nenhuma coincidência encontrada entre as contas ativas pelo vencimento/valor, número de documento ou código de barras.'));
+ dialog.showModal();
 }
 function filtered(){if(kind==='calendar'&&['commissions','dda'].includes(HSN_PHASE3.getCalendarModule()))return [];const search=$('search').value.toLocaleLowerCase('pt-BR');return data.payables.filter(p=>p.archived===(kind==='calendar'?false:showArchived)).filter(p=>(kind==='calendar'?p.due_date.slice(0,7):p.competence.slice(0,7))===month).filter(p=>!statusFilter||D().status(p)===statusFilter).filter(p=>kind!=='payables'||!workflowFilter||workflowStage(p)===workflowFilter).filter(p=>!typeFilter||p.type_id===typeFilter).filter(p=>[p.title,supplier(p)?.legal_name,supplier(p)?.trade_name,type(p)?.name,p.document_number].join(' ').toLocaleLowerCase('pt-BR').includes(search)).sort((a,b)=>a.due_date.localeCompare(b.due_date)||a.title.localeCompare(b.title));}
 function stat(title,value,description,cls=''){const card=el('div',undefined,'stat '+cls);card.append(el('small',title),el('strong',money(value)),el('span',description,'muted'));$('summary').append(card);}
@@ -359,6 +405,17 @@ async function saveFinance(event){event.preventDefault();await operation(async()
  if(payload.due_date!==payload.original_due_date&&!confirm('O vencimento será ajustado de '+D().br(payload.original_due_date)+' para '+D().br(payload.due_date)+'. Confirmar?'))return;
  if(record?.payment_status==='paid'&&!confirm('Salvar alterações nesta conta já paga?'))return;
  }
+ }
+ if(table==='payables'){
+  // Inclusões e mudanças que alterem a identidade financeira passam por conferência.
+  // Edições apenas de observação/status não são impedidas por duplicidades antigas.
+  const identity=['supplier_id','title','original_due_date','due_date','estimated_amount','actual_amount','document_number','barcode'];
+  const changed=!record||identity.some(key=>String(payload[key]??'')!==String(record[key]??''));
+  if(changed){
+   const current=check(await db.from('payables').select('*').eq('owner_id',user.id));
+   const hits=HSN_IMPORT_RULES.blocking({...payload,id:record?.id},current,data.suppliers);
+   if(hits.length)throw Error('Possível conta duplicada bloqueada. Revise a conta existente antes de cadastrar novamente: '+HSN_IMPORT_RULES.describe(hits));
+  }
  }
  if(table==='payables'&&!HSN_PHASE3.confirmVariation(record,payload,data))return;
  const result=check(await (record?db.from(table).update(payload).eq('id',record.id).eq('updated_at',record.updated_at):db.from(table).insert({...payload,owner_id:user.id})).select('id'));if(result.length!==1)throw Error('Cadastro mudou em outro aparelho. Feche e atualize antes de salvar.');$('finance-dialog').close();notice('Cadastro salvo no Supabase.');await loadFinance(view);if(table==='payables')HSN_DOCUMENT_READING.afterSave(result[0].id);});}

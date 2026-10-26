@@ -1,0 +1,14 @@
+HSN 9.1 - conferência em ambiente de desenvolvimento
+
+- node --check js/import-rules.js: passou
+- node --check js/phase4.js: passou
+- node --check js/finance.js: passou
+- node test_guard.cjs: 14 cenários passaram
+
+Cenários incluídos: BOA GULA, MULTI FORMATO, BHZ, LAT/LATICINIOS,
+ECAD abreviado, documentos diferentes, boletos com mesmo código de barras,
+conta arquivada ignorada, fornecedores diferentes, valor zero,
+documento de mês diferente e totais excluindo arquivados.
+
+Pendente de validação no navegador publicado e no Supabase de teste.
+Nenhuma atualização financeira real foi efetuada.
