@@ -1,0 +1,14 @@
+/* HSN 9.1 - Central de auditoria em modo somente leitura */
+.hsn91-audit-dialog { box-sizing:border-box; width:min(1180px,96vw); max-width:96vw; max-height:88dvh; padding:20px; overflow:auto; border:1px solid var(--border, #314962); border-radius:18px; color:var(--text,#e7eef9); background:var(--surface,#12263e); box-shadow:0 30px 90px #0008; }
+.hsn91-audit-dialog::backdrop{background:rgba(0,0,0,.72)}
+.hsn91-audit-dialog .topline{position:sticky;top:-20px;z-index:2;background:inherit;padding:12px 0;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.hsn91-audit-dialog .topline h2{margin:0;font-size:1.35rem}
+.hsn91-audit-scroller{overflow-x:auto;max-height:58vh;overflow-y:auto;max-width:100%;border:1px solid var(--border,#314962);border-radius:12px}
+.hsn91-audit-scroller table{min-width:970px;width:100%;border-collapse:collapse}
+.hsn91-audit-scroller th,.hsn91-audit-scroller td{padding:10px;vertical-align:top;white-space:normal;font-size:12px;border-bottom:1px solid var(--border,#314962)}
+.hsn91-audit-scroller th{position:sticky;top:0;z-index:1;background:var(--surface,#12263e)}
+.hsn91-audit-scroller td strong{display:block;overflow-wrap:anywhere}
+.hsn91-audit-scroller td small{display:block;opacity:.75;margin-top:5px;overflow-wrap:anywhere}
+.hsn91-audit-scroller button{margin:2px;white-space:nowrap}
+.hsn91-blocked{color:#fbbf24;font-weight:650;line-height:1.5}
+@media(max-width:700px){.hsn91-audit-dialog{width:100vw;max-width:100vw;height:96dvh;max-height:96dvh;border-radius:12px;padding:12px}.hsn91-audit-dialog .topline{top:-12px}.hsn91-audit-dialog .topline h2{font-size:1.12rem}.hsn91-audit-scroller{max-height:65dvh}}
