@@ -18,3 +18,116 @@
 .hsn-billing-label input{box-sizing:border-box;width:100%;border:1px solid var(--line,rgba(148,163,184,.35));background:var(--bg,rgba(15,23,42,.7));color:var(--ink,inherit);border-radius:10px;padding:12px;font:inherit;font-size:14px;font-weight:400}
 .hsn-billing-email-tools{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:12px 0}.hsn-billing-email-chips{display:flex;flex-wrap:wrap;gap:7px;margin:8px 0 20px}.hsn-billing .hsn-billing-email-chip{font-size:12px!important;font-weight:500!important;padding:7px 11px!important;background:rgba(148,163,184,.12)!important;border:1px solid rgba(148,163,184,.32)!important;color:var(--ink,#eaf0f7)!important;border-radius:99px!important;max-width:100%;overflow-wrap:anywhere;cursor:pointer}
 .hsn-billing-signature-preview{display:grid;gap:8px}.hsn-billing-signature-image{max-width:310px;max-height:110px;object-fit:contain;object-position:left center;background:#fff;border-radius:8px;padding:8px;box-sizing:border-box}
+
+/* HSN 9.2.4 — contatos compactos e buscáveis */
+.hsn-billing .hsn-billing-label textarea {
+  min-height:48px;
+  height:52px;
+  max-height:115px;
+  resize:vertical;
+  padding:11px 13px;
+  line-height:1.45;
+}
+.hsn-billing-contact-toolbar {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  align-items:center;
+  margin:10px 0;
+}
+.hsn-billing .hsn-billing-contact-toolbar button {
+  border-radius:10px!important;
+  padding:8px 12px!important;
+  font-size:12px!important;
+  min-height:36px;
+}
+.hsn-billing-contacts-panel {
+  margin:0 0 15px;
+  border:1px solid var(--line,rgba(148,163,184,.25));
+  background:rgba(148,163,184,.045);
+  border-radius:11px;
+  overflow:hidden;
+}
+.hsn-billing-contacts-panel>summary {
+  display:flex;
+  align-items:center;
+  gap:9px;
+  padding:11px 13px;
+  cursor:pointer;
+  font-size:13px;
+  font-weight:700;
+  list-style:none;
+}
+.hsn-billing-contacts-panel>summary::-webkit-details-marker{display:none}
+.hsn-billing-contacts-panel>summary:before {
+  content:"▸";color:var(--muted,#94a3b8);font-size:12px;
+}
+.hsn-billing-contacts-panel[open]>summary:before{content:"▾"}
+.hsn-billing-count {
+  display:inline-flex;
+  padding:3px 7px;
+  border-radius:30px;
+  font-size:11px;
+  font-weight:650;
+  background:rgba(249,115,22,.13);
+  color:#fb923c;
+}
+.hsn-billing-contacts-hint{margin-left:auto;color:var(--muted,#94a3b8);font-size:11px;font-weight:400}
+.hsn-billing-contacts-body {
+  border-top:1px solid var(--line,rgba(148,163,184,.2));
+  padding:12px;
+}
+.hsn-billing-contacts-body>input[type=search] {
+  width:100%;
+  box-sizing:border-box;
+  padding:10px 12px;
+  border:1px solid var(--line,rgba(148,163,184,.35));
+  border-radius:9px;
+  background:var(--bg,rgba(15,23,42,.7));
+  color:var(--ink,#eaf0f7);
+  outline-offset:2px;
+  font:inherit;
+  font-size:13px;
+}
+.hsn-billing-contacts-results {
+  display:grid;
+  gap:2px;
+  max-height:232px;
+  overflow-y:auto;
+  margin-top:9px;
+}
+.hsn-billing .hsn-billing-saved-row {
+  width:100%;
+  min-width:0;
+  box-sizing:border-box;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  border:0!important;
+  border-radius:8px!important;
+  padding:9px 10px!important;
+  background:transparent!important;
+  color:var(--ink,#eaf0f7)!important;
+  text-align:left;
+  font-size:12px!important;
+  font-weight:500!important;
+  cursor:pointer;
+}
+.hsn-billing .hsn-billing-saved-row:hover,
+.hsn-billing .hsn-billing-saved-row:focus-visible {
+  background:rgba(148,163,184,.13)!important;
+}
+.hsn-billing-saved-row>span {min-width:0;overflow-wrap:anywhere}
+.hsn-billing-saved-row>strong {
+  white-space:nowrap;
+  font-size:11px;
+  font-weight:650;
+  color:#fb923c;
+}
+.hsn-billing-saved-row[data-selected=true]>strong {color:#4ade80}
+@media(max-width:590px){
+ .hsn-billing-contacts-hint{display:none}
+ .hsn-billing .hsn-billing-contact-toolbar button{flex:1}
+ .hsn-billing-saved-row>span{font-size:11px}
+}
