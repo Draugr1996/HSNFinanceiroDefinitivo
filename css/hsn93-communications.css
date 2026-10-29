@@ -40,3 +40,36 @@
 
 .hsn93-shortcuts{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}.hsn93-shortcuts button{font-size:.78rem!important;min-height:35px!important;padding:7px 10px!important}
 @media(max-width:620px){.hsn93-shortcuts{justify-content:flex-start}}
+
+/* 9.3.1: #records is a shared card grid. The whole workspace must span it. */
+#records:has(> .hsn93-root){display:block!important;width:100%;min-width:0;max-width:none!important}
+#app:has(.hsn93-root)>.content{min-width:0;width:100%;max-width:none;box-sizing:border-box}
+.hsn93-root{max-width:none;min-width:0;box-sizing:border-box;container-type:inline-size}
+.hsn93-root *{box-sizing:border-box}
+.hsn93-top{flex-wrap:wrap;align-items:flex-start}
+.hsn93-top>div:first-child{flex:1 1 340px;min-width:0}
+.hsn93-top h2{overflow-wrap:normal;word-break:normal}
+.hsn93-shortcuts{flex:0 1 auto;align-items:center}
+.hsn93-shortcuts button,.hsn93-tabs button,.hsn93-pagination button{white-space:nowrap;width:auto;word-break:normal;flex-shrink:0}
+.hsn93-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+.hsn93-stat span,.hsn93-stat small{overflow-wrap:normal;word-break:normal}
+.hsn93-tools>input{flex:1 1 240px;min-width:0;max-width:100%}
+.hsn93-tools select{width:auto;max-width:100%;min-height:36px;border:1px solid #748399;border-radius:8px;padding:7px;color:inherit;background:transparent}
+.hsn93-tools select option{color:#15243a;background:#f3f6fb}
+.hsn93-tabs{flex-wrap:wrap}
+.hsn93-timeline-head{flex-wrap:wrap}
+.hsn93-activity-list{max-height:560px;overflow:auto;scrollbar-gutter:stable}
+.hsn93-activity summary{padding:6px 4px;min-height:48px}
+.hsn93-kind{min-width:28px;height:28px;border-radius:6px}
+.hsn93-activity-main{grid-template-columns:minmax(0,1fr) minmax(90px,.45fr);align-items:center}
+.hsn93-activity-side{grid-template-columns:auto 90px;align-items:center;gap:16px}
+.hsn93-details{padding:6px 12px 12px 42px}
+.hsn93-pagination{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:12px;padding-top:12px;font-size:.78rem}
+.hsn93-pagination button:disabled{opacity:.45;cursor:default}
+.hsn93-alert details{margin-top:8px;overflow-wrap:anywhere}.hsn93-alert summary{cursor:pointer}.hsn93-alert p{margin:6px 0}
+@container(max-width:850px){.hsn93-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.hsn93-columns{grid-template-columns:1fr}.hsn93-activity-main{grid-template-columns:1fr}.hsn93-activity-side{grid-template-columns:1fr;gap:4px}}
+@container(max-width:420px){.hsn93-kpis{grid-template-columns:1fr}.hsn93-shortcuts{justify-content:flex-start}.hsn93-shortcuts button{flex:1 1 auto}.hsn93-pagination{justify-content:center}.hsn93-tools>input{width:100%}}
+
+@media(max-width:620px){.hsn93-top>div:first-child{flex:0 1 auto;width:100%}}
+@container(max-width:420px){.hsn93-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@container(max-width:320px){.hsn93-kpis{grid-template-columns:1fr}}
