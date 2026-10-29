@@ -293,4 +293,4 @@ const sendArea=make('section',undefined,'hsn-billing-send-area');sendArea.append
  recipientInput.focus({preventScroll:true});
 });sendArea.append(reset);panel.append(sendArea);
 const historySection=make('section',undefined,'hsn-billing-history-section');const historyHeader=make('div',undefined,'hsn-billing-history-header');historyHeader.append(make('h3','Últimos envios'));historyCountNode=make('span','Carregando…','hsn-billing-history-count');historyHeader.append(historyCountNode);historySection.append(historyHeader);historyNode=make('div',undefined,'hsn-billing-history-list');historySection.append(historyNode);panel.append(historySection);$('records').append(panel);document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view==='billing_send'));showFiles();updatePreview();updateSignatureView();refreshSaved();loadSignature();refreshHistory();}
-return {show};})();
+return {show,parseCSV:parseDelimitedCSV};})();

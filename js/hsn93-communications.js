@@ -125,7 +125,7 @@ async function load(){if(loading||!user)return;loading=true;loaded=false;errorTe
   safeRows('hsn_billing_dispatches','id,owner_id,company,subject,to_emails,cc_emails,file_names,status,sent_at,created_at'),
   safeRows('sicoob_collections','id,owner_id,company,reference,external_reference,due_date,amount,status','due_date'),
   safeRows('hsn_billing_recipients','id,owner_id,company,to_emails,cc_emails,updated_at','updated_at'),
-  safeRows('sicoob_contacts','id,owner_id,company,email,created_at'),
+  safeRows('sicoob_contacts','id,owner_id,company,email','company'),
   safeRows('sicoob_collection_dispatches','id,owner_id,collection_id,status,recipient_email,created_at,sent_at'),
   safeRows('hsn_communication_links','*'),
   safeRows('hsn_communication_followups','*')]);
