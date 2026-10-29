@@ -43,7 +43,7 @@
 
 /* 9.3.1: #records is a shared card grid. The whole workspace must span it. */
 #records:has(> .hsn93-root){display:block!important;width:100%;min-width:0;max-width:none!important}
-#app:has(.hsn93-root)>.content{min-width:0;width:100%;max-width:none;box-sizing:border-box}
+#app:has(.hsn93-root)>.content{min-width:0;width:auto;max-width:none;box-sizing:border-box}
 .hsn93-root{max-width:none;min-width:0;box-sizing:border-box;container-type:inline-size}
 .hsn93-root *{box-sizing:border-box}
 .hsn93-top{flex-wrap:wrap;align-items:flex-start}
@@ -73,3 +73,11 @@
 @media(max-width:620px){.hsn93-top>div:first-child{flex:0 1 auto;width:100%}}
 @container(max-width:420px){.hsn93-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @container(max-width:320px){.hsn93-kpis{grid-template-columns:1fr}}
+
+/* 9.3.2: keep the shell sidebar offset; auto width uses only remaining space. */
+#records:has(> .hsn93-root){box-sizing:border-box}
+.hsn93-root{grid-template-columns:minmax(0,1fr)}
+.hsn93-root>*,.hsn93-top>*,.hsn93-tools>*,.hsn93-panel-content{min-width:0;max-width:100%}
+.hsn93-tools>button{white-space:normal}
+.hsn93-pagination{flex-direction:row;overflow:visible}
+.hsn93-pagination button{display:inline-flex;justify-content:center;flex:0 0 auto;width:auto;padding:7px 10px;min-height:34px}
