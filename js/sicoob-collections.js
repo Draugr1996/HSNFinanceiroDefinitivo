@@ -1,6 +1,7 @@
 /* Cobranças Sicoob: conferência humana obrigatória. Sem credenciais Zoho no navegador. */
 window.HSN_SICOOB=(()=>{'use strict';
 let items=[], contacts=[], dispatches=[], historyError="", ready=false, busy=false, selected=new Set(), activeTab="pending";
+let sharedAddressBook=[],sharedContactError='';
 const $=id=>document.getElementById(id), node=(tag,txt,cls)=>{const e=document.createElement(tag);if(txt!==undefined)e.textContent=txt;if(cls)e.className=cls;return e;};
 const button=(txt,fn)=>{const b=node('button',txt,'secondary');b.type='button';b.onclick=fn;return b;};
 const fmt=n=>Number(n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
@@ -27,15 +28,111 @@ function parse(rows){
  return [...new Map(parsed.map(x=>[x.reference+'|'+x.due_date,x])).values()];
 }
 function check(x){if(x.error)throw x.error;return x.data;}
+// Agenda compartilhada: consulta os e-mails do faturamento, inclusive importados do CSV do Zoho.
+// Somente leitura aqui; a associação a cada empresa Sicoob exige seleção e salvamento explícitos.
+async function loadSharedAddressBook(){
+ const entries=new Map();
+ const accept=(address,company,origin)=>{
+  const email=String(address||'').trim(), key=email.toLocaleLowerCase('pt-BR');
+  if(!validEmail(email))return;
+  if(!entries.has(key))entries.set(key,{email,companies:new Set(),sources:new Set()});
+  const entry=entries.get(key);
+  if(company&&!String(company).startsWith('EMAIL:'))entry.companies.add(String(company).trim());
+  entry.sources.add(origin);
+ };
+ for(const c of contacts)for(const e of emailsFor(c))accept(e,c.company,'Sicoob');
+ let error='';
+ try{
+  // Paginar para não depender do limite padrão de linhas do Supabase.
+  for(let start=0;start<5000;start+=500){
+   const {data,error:queryError}=await db.from('hsn_billing_recipients')
+    .select('to_emails,cc_emails,company').eq('owner_id',user.id)
+    .order('updated_at',{ascending:false}).range(start,start+499);
+   if(queryError)throw queryError;
+   for(const row of data||[]){
+    for(const e of [...emailsFor({email:row.to_emails}),...emailsFor({email:row.cc_emails})])
+     accept(e,row.company,'Faturamento / Zoho');
+   }
+   if((data||[]).length<500)break;
+  }
+ }catch(e){error='Não foi possível consultar a agenda do faturamento: '+(e?.message||String(e));}
+ sharedAddressBook=[...entries.values()].map(x=>({...x,companies:[...x.companies],sources:[...x.sources]}))
+  .sort((a,b)=>a.email.localeCompare(b.email,'pt-BR'));
+ sharedContactError=error;
+}
+function showSharedPicker(parent,company,toInput,ccInput){
+ const details=node('details',undefined,'sicoob-shared-contacts');
+ const summary=node('summary','Escolher da agenda de e-mails ('+sharedAddressBook.length+')');
+ const wrap=node('div',undefined,'sicoob-shared-contacts-body');
+ const search=node('input');search.type='search';search.placeholder='Pesquisar e-mail ou nome da empresa…';
+ search.setAttribute('aria-label','Pesquisar agenda compartilhada do faturamento');
+ const results=node('div',undefined,'sicoob-shared-contacts-results');
+ const hint=node('p','Selecione o endereço e depois clique em “Salvar destinatários” desta empresa. Não envia nenhuma cobrança.','sicoob-shared-hint');
+ wrap.append(search,results,hint);
+ if(sharedContactError)wrap.append(node('p',sharedContactError,'sicoob-shared-error'));
+ const addCc=email=>{
+  const values=emailsFor({email:ccInput.value});
+  const primary=toInput.value.trim().toLowerCase();
+  if(email.toLowerCase()===primary||values.some(v=>v.toLowerCase()===email.toLowerCase()))return;
+  ccInput.value=[...values,email].join('; ');
+ };
+ function draw(){
+  results.replaceChildren();
+  const q=clean(search.value);
+  const ranked=sharedAddressBook.filter(e=>!q||clean(e.email+' '+e.companies.join(' ')).includes(q))
+   .sort((a,b)=>{
+     const matchA=a.companies.some(n=>clean(n)===clean(company))?1:0;
+     const matchB=b.companies.some(n=>clean(n)===clean(company))?1:0;
+     return matchB-matchA||a.email.localeCompare(b.email,'pt-BR');
+   });
+  if(!ranked.length){results.append(node('p',sharedContactError?'Agenda indisponível. Confira a conexão.':'Nenhum contato encontrado. Importe os contatos em “Enviar faturamento”.','sicoob-shared-hint'));return;}
+  for(const entry of ranked.slice(0,20)){
+   const row=node('div',undefined,'sicoob-shared-item');
+   const info=node('div',undefined,'sicoob-shared-info');
+   info.append(node('strong',entry.email));
+   if(entry.companies.length)info.append(node('small',entry.companies.slice(0,2).join(' · ')));
+   const actions=node('div',undefined,'sicoob-shared-buttons');
+   const to=button('Usar em Para',()=>{toInput.value=entry.email;hint.textContent='E-mail principal selecionado. Clique em “Salvar destinatários” antes de preparar a cobrança.';});
+   const cc=button('+ CC',()=>{addCc(entry.email);hint.textContent='E-mail em cópia adicionado. Clique em “Salvar destinatários” antes de preparar a cobrança.';});
+   to.classList.add('sicoob-shared-pick');cc.classList.add('sicoob-shared-pick');
+   actions.append(to,cc);row.append(info,actions);results.append(row);
+  }
+  if(ranked.length>20)results.append(node('p','Exibindo 20 de '+ranked.length+' contatos. Refine a pesquisa.','sicoob-shared-hint'));
+ }
+ details.append(summary,wrap);details.addEventListener('toggle',()=>{if(details.open){draw();search.focus();}});
+ search.addEventListener('input',draw);parent.append(details);
+}
+function installSharedPickerStyle(){
+ if(document.getElementById('hsn-sicoob-shared-css'))return;
+ const style=node('style');style.id='hsn-sicoob-shared-css';
+ style.textContent=`
+ .sicoob-shared-contacts{width:100%;margin:10px 0 2px;border:1px solid rgba(148,163,184,.25);border-radius:12px;background:rgba(20,36,58,.2);font-size:.88rem}
+ .sicoob-shared-contacts summary{padding:11px 13px;cursor:pointer;list-style:revert;font-weight:600;color:inherit}
+ .sicoob-shared-contacts-body{padding:0 12px 12px}
+ .sicoob-shared-contacts-body>input{display:block;width:100%;min-width:0;margin-bottom:9px;padding:10px;border-radius:9px;border:1px solid rgba(148,163,184,.3);background:rgba(20,36,58,.16);color:inherit}
+ .sicoob-shared-contacts-results{max-height:260px;overflow-y:auto;display:grid;gap:5px}
+ .sicoob-shared-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px;border:1px solid rgba(148,163,184,.18);border-radius:9px}
+ .sicoob-shared-info{min-width:0;overflow-wrap:anywhere;display:grid;gap:2px;flex:1}
+ .sicoob-shared-info strong{font-size:.84rem}
+ .sicoob-shared-info small{font-size:.73rem;opacity:.72}
+ .sicoob-shared-buttons{display:flex;align-items:center;gap:5px;flex-shrink:0}
+ .sicoob-shared-pick{font-size:.76rem!important;min-height:32px;padding:6px 9px!important}
+ .sicoob-shared-hint,.sicoob-shared-error{font-size:.77rem;opacity:.78;margin:8px 2px 3px}
+ .sicoob-shared-error{color:#fda4af;opacity:1}
+ @media(max-width:650px){.sicoob-shared-item{align-items:stretch;flex-direction:column}.sicoob-shared-buttons{justify-content:flex-start;flex-wrap:wrap}}
+ `;
+ document.head.append(style);
+}
 async function fetchData(){
  const [a,b,h]=await Promise.all([
   db.from('sicoob_collections').select('*').order('due_date',{ascending:true}),
-  db.from('sicoob_contacts').select('*'),
+  db.from('sicoob_contacts').select('*').eq('owner_id',user.id),
   db.from('sicoob_collection_dispatches').select('id,collection_id,owner_id,status,recipient_email,sent_at,created_at').eq('owner_id',user.id).order('created_at',{ascending:false}).limit(1000)
  ]);
  items=check(a)||[];contacts=check(b)||[];
  if(h.error){dispatches=[];historyError='Não foi possível consultar o histórico: '+h.error.message;}
  else{dispatches=h.data||[];historyError='';}
+ await loadSharedAddressBook();
  ready=true;
 }
 async function load(){if(!user)return;try{await fetchData();render();}catch(e){ready=false;render();$('records').prepend(node('p','Não foi possível carregar as cobranças. Verifique as tabelas do Supabase. '+e.message,'hint'));}}
@@ -79,7 +176,46 @@ async function prepareIndividual(r){
  }catch(e){alert('Não foi possível concluir a conferência: '+(e?.message||String(e)));}
  finally{busy=false;}
 }
-async function sendBatch(){alert('Envio em lote bloqueado nesta etapa. Vamos validar primeiro o envio individual.');}
+async function sendBatch(){
+ if(busy)return;
+ // Limite operacional para tokens de autorizacao de 5 minutos e conferencias individuais.
+ const targets=items.filter(r=>selected.has(r.id)&&eligible(r)&&!dispatches.some(d=>d.collection_id===r.id));
+ if(!targets.length){alert('Nenhum boleto elegível. Confira vencimentos, pagamentos, documentos, destinatários e histórico.');return;}
+ if(targets.length>5){alert('Para segurança, selecione no máximo 5 cobranças por lote. Divida os envios e confira os resultados antes do próximo.');return;}
+ busy=true;let completed=0;
+ try{
+  const previews=[];
+  for(const r of targets){
+   const {data,error}=await db.functions.invoke('zoho-send-mail',{body:{mode:'preview',collection_id:r.id}});
+   if(error||!data?.success||data.mode!=='preview'||data.sending_enabled!==false||!data.approval_token){
+    let reason=data?.error||error?.message||'Conferência não autorizada';
+    try{if(error?.context?.json)reason=(await error.context.json())?.error||reason;}catch(_e){}
+    throw Error('Prévia de '+r.company+': '+reason);
+   }
+   previews.push(data);
+  }
+  const lines=previews.map((x,i)=>`${i+1}. ${x.company} | Documento ${x.document_number} | ${fmt(x.amount)} | Venc.: ${x.due_date.split('-').reverse().join('/')}\n   PARA: ${x.to}\n   CC: ${(x.cc||[]).join('; ')||'(nenhum)'}`).join('\n\n');
+  const amount=previews.reduce((s,r)=>s+Number(r.amount||0),0);
+  if(!confirm('PRIMEIRA CONFERÊNCIA — LOTE SICOOB\n\n'+lines+'\n\n'+previews.length+' cobrança(s) · '+fmt(amount)+'\n\nNada foi enviado. Deseja prosseguir à autorização final?'))return;
+  if(!confirm('CONFIRMAÇÃO FINAL — ENVIO REAL\n\nO Zoho enviará ATÉ '+previews.length+' e-mail(s) de cobrança para os endereços acima.\n\nVocê conferiu no Sicoob que TODOS estão vencidos e NÃO PAGOS e validou os destinatários?\n\nCANCELAR não envia nada. OK AUTORIZA o início do lote.'))return;
+  for(const x of previews){
+   // O servidor revalida status pendente, ausência de despacho e dados assinados em cada item.
+   const {data,error}=await db.functions.invoke('zoho-send-mail',{body:{mode:'send_individual',collection_id:x.collection_id,approval_token:x.approval_token}});
+   if(error||!data?.success){
+    let reason=data?.error||error?.message||'Envio não confirmado';
+    try{if(error?.context?.json)reason=(await error.context.json())?.error||reason;}catch(_e){}
+    throw Error('Interrompido no boleto '+x.document_number+': '+reason+' NÃO reenvie este lote sem conferir a pasta Enviados do Zoho.');
+   }
+   completed++;selected.delete(x.collection_id);
+  }
+  selected.clear();await fetchData();render();
+  alert('Zoho confirmou '+completed+' cobrança(s). Confira o histórico. Nenhum título pago foi incluído na preparação.');
+ }catch(e){
+  // Nunca reiniciar a fila automaticamente: resultado de alguma etapa pode ser incerto.
+  try{await fetchData();render();}catch(_e){}
+  alert('Lote interrompido. '+completed+' envio(s) confirmado(s) antes da interrupção. '+(e?.message||e));
+ }finally{busy=false;}
+}
 
 function historyDate(value){
  if(!value)return '—';
@@ -168,6 +304,7 @@ function renderHistory(parent){
 }
 function render(){
  if(view!=='sicoob_collections')return;
+ installSharedPickerStyle();
  $('view-title').textContent='Cobranças Sicoob';
  $('view-description').textContent='Importe, confira e prepare cada cobrança individualmente.';
  document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view==='sicoob_collections'));
@@ -204,9 +341,9 @@ function render(){
  importLabel.append(input);bar.append(importLabel);
  bar.append(button('Selecionar elegíveis',()=>{items.filter(eligible).forEach(r=>selected.add(r.id));render();}),button('Limpar seleção',()=>{selected.clear();render();}));
  const send=button(`Enviar selecionados (${[...selected].filter(id=>items.some(r=>r.id===id&&eligible(r))).length})`,sendBatch);
- send.disabled=true;send.title='Envio desativado até validação da função segura no Supabase';bar.append(send);
+ send.disabled=busy||![...selected].some(id=>items.some(r=>r.id===id&&eligible(r)));send.title='Máximo de 5 boletos por lote, com prévia e autorização final. Se houver falha, confira Enviados antes de repetir.';bar.append(send);
  panel.append(bar);
- panel.append(node('p','Envio individual disponível: confira o boleto e os destinatários. Após duas confirmações, o e-mail será enviado pelo Zoho. Envio em lote continua desativado.','sicoob-notice'));
+ panel.append(node('p','Envio em lote: até 5 boletos elegíveis por operação. Confira todas as prévias e confirme antes do Zoho. O servidor verifica novamente status, histórico e destinatários; falhas interrompem o lote sem reenvio automático.','sicoob-notice'));
  const count=node('div',undefined,'sicoob-table-heading');
  count.append(node('h2',activeTab==='pending'?'Boletos pendentes':activeTab==='sent'?'Boletos cobrados':'Boletos pagos'),node('span',`${items.filter(r=>r.status===activeTab).length} título(s) nesta aba · ${selected.size} selecionado(s)`));panel.append(count);
  const cards=node('div',undefined,'sicoob-cards');
@@ -234,7 +371,9 @@ function render(){
   const cc=node('textarea');cc.rows=2;cc.placeholder='contasapagar@empresa.com.br; outro@empresa.com.br';cc.value=savedEmails.slice(1).join('; ');
   cc.setAttribute('aria-label',`E-mails em cópia de ${r.company}`);ccLabel.append(cc);
   const save=button('Salvar destinatários',async()=>{try{await saveContact(r.company,email.value,cc.value);}catch(e){alert(e.message);}});
-  emailRow.append(toLabel,ccLabel,save);
+  emailRow.append(toLabel,ccLabel);
+  showSharedPicker(emailRow,r.company,email,cc);
+  emailRow.append(save);
   const actions=node('div',undefined,'sicoob-card-actions');
   const preview=button('✉ Ver e-mail',()=>{const recipients=emailsFor(contact(r.company));alert(`Para: ${recipients[0]||'(não cadastrado)'}\nCC: ${recipients.slice(1).join('; ')||'(nenhum)'}\nAssunto: Hotel Serra Negra | Aviso de pendência financeira – Boleto nº ${docNumber(r)||'[NÃO INFORMADO]'}\n\n${message(r)}`);});
   preview.classList.add('sicoob-card-preview');

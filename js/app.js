@@ -1,7 +1,7 @@
 /* Financeiro HSN · Fase 3. Contas e comissões permanecem separadas. */
 'use strict';
 const $=id=>document.getElementById(id);
-const titles={approvals:'Central de aprovação',reconciliation:'Conciliação bancária',payments_agenda:'Agenda de pagamentos',dashboard:'Seu painel',suppliers:'Fornecedores',account_types:'Tipos de conta',message_templates:'Mensagens prontas',payables:'Contas a pagar',recurring_models:'Contas recorrentes',calendar:'Calendário',local_holidays:'Feriados locais',alerts:'Alertas de contas',commissions:'Comissões',commission_alerts:'Alertas de comissões',alert_settings:'Configurações de alertas',dda:'DDA',imports:'Importar / exportar',reports:'Relatórios',cash_forecast:'Previsão de caixa',audit:'Histórico de alterações',adjustments:'Reajustes de contrato',backups:'Backups',push:'Notificações no telefone',zoho_connect:'Conexão Zoho Mail',billing_send:'Envio de faturamento',sicoob_collections:'Cobranças Sicoob'};
+const titles={approvals:'Central de aprovação',reconciliation:'Conciliação bancária',payments_agenda:'Agenda de pagamentos',dashboard:'Seu painel',suppliers:'Fornecedores',account_types:'Tipos de conta',message_templates:'Mensagens prontas',payables:'Contas a pagar',recurring_models:'Contas recorrentes',calendar:'Calendário',local_holidays:'Feriados locais',alerts:'Alertas de contas',commissions:'Comissões',commission_alerts:'Alertas de comissões',alert_settings:'Configurações de alertas',dda:'DDA',imports:'Importar / exportar',reports:'Relatórios',cash_forecast:'Previsão de caixa',audit:'Histórico de alterações',adjustments:'Reajustes de contrato',backups:'Backups',push:'Notificações no telefone',zoho_connect:'Conexão Zoho Mail',billing_send:'Envio de faturamento',sicoob_collections:'Cobranças Sicoob',communications:'Central de comunicação'};
 
 /* Sugestões opcionais; usuários escolhem quais cadastrar. Nunca renomeia tipos existentes. */
 const recommendedTypes=[
@@ -63,6 +63,7 @@ async function acceptSession(session){
 }
 async function load(){
  loadToken++;
+ if(view==='communications'){if(user)HSN_COMMUNICATIONS.load();return;}
  if(view==='sicoob_collections'){if(user)HSN_SICOOB.load();return;}
  if(view==='zoho_connect'){if(user)HSN_ZOHO.show();return;}
  if(view==='billing_send'){if(user)HSN_FATURAMENTO.show();return;}
@@ -74,6 +75,7 @@ async function load(){
 function render(){
  HSN_THEME.describe(view);
  $('search').closest('.search-wrap').hidden=false;
+ if(view==='communications')return HSN_COMMUNICATIONS.render();
  if(view==='sicoob_collections')return HSN_SICOOB.render();
  if(view==='zoho_connect')return HSN_ZOHO.show();
  if(view==='billing_send')return HSN_FATURAMENTO.show();
