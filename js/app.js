@@ -3,6 +3,59 @@
 const $=id=>document.getElementById(id);
 const titles={approvals:'Central de aprovação',reconciliation:'Conciliação bancária',payments_agenda:'Agenda de pagamentos',dashboard:'Seu painel',suppliers:'Fornecedores',account_types:'Tipos de conta',message_templates:'Mensagens prontas',payables:'Contas a pagar',recurring_models:'Contas recorrentes',calendar:'Calendário',local_holidays:'Feriados locais',alerts:'Alertas de contas',commissions:'Comissões',commission_alerts:'Alertas de comissões',alert_settings:'Configurações de alertas',dda:'DDA',imports:'Importar / exportar',reports:'Relatórios',cash_forecast:'Previsão de caixa',audit:'Histórico de alterações',adjustments:'Reajustes de contrato',backups:'Backups',push:'Notificações no telefone',zoho_connect:'Conexão Zoho Mail',billing_send:'Envio de faturamento',sicoob_collections:'Cobranças Sicoob',communications:'Central de comunicação'};
 
+/* HSN 9.4.1 — Recuperação segura de módulos financeiros.
+ * Não altera dados e não inicia envios. Garante mensagens visíveis quando uma implantação
+ * parcial ou cache misto deixa um dos módulos sem carregar. */
+const hsnFinancialModules=Object.freeze({
+ communications:{global:'HSN_COMMUNICATIONS',path:'js/hsn93-communications.js',title:'Central de comunicação',method:'load'},
+ sicoob_collections:{global:'HSN_SICOOB',path:'js/sicoob-collections.js',title:'Cobranças Sicoob',method:'load'},
+ billing_send:{global:'HSN_FATURAMENTO',path:'js/hsn92-faturamento.js',title:'Enviar faturamento',method:'show'}
+});
+const hsnPendingModuleScripts=new Map();
+function hsnModuleError(title,error){
+ const records=$('records');if(!records)return;
+ $('view-title').textContent=title;
+ $('view-description').textContent='Não foi possível abrir esta seção. Nenhum e-mail foi enviado.';
+ $('new').hidden=true;
+ for(const id of ['finance-controls','calendar-board','summary','records'])$(id)?.replaceChildren();
+ const card=el('section',undefined,'card full-width hsn-module-repair-error');
+ card.append(el('h2',title+' indisponível'));
+ card.append(el('p','Um arquivo do módulo pode estar ausente, desatualizado ou bloqueado pelo cache. Seus registros permanecem no Supabase.'));
+ card.append(el('p',String(error?.message||error||'Falha de carregamento desconhecida.')));
+ card.append(button('Tentar abrir novamente',()=>{if(user)hsnOpenFinancial(view);},'secondary'));
+ records.append(card);
+ console.error('[Financeiro HSN 9.4.1]',title,error);
+}
+async function hsnGetFinancialModule(name){
+ const spec=hsnFinancialModules[name];if(!spec)throw Error('Módulo desconhecido.');
+ if(typeof window[spec.global]?.[spec.method]==='function')return window[spec.global];
+ if(!hsnPendingModuleScripts.has(name)){
+  const task=new Promise((resolve,reject)=>{
+   const sc=document.createElement('script');sc.async=true;
+   sc.src=spec.path+'?v=9-4-1-20261104-recovery';
+   sc.onload=()=>typeof window[spec.global]?.[spec.method]==='function'?resolve(window[spec.global]):reject(Error('Arquivo carregado, mas '+spec.global+' não inicializou.'));
+   sc.onerror=()=>reject(Error('Não foi possível carregar '+spec.path+'. Verifique se o arquivo existe na pasta js do GitHub.'));
+   document.head.append(sc);
+  }).finally(()=>hsnPendingModuleScripts.delete(name));
+  hsnPendingModuleScripts.set(name,task);
+ }
+ return hsnPendingModuleScripts.get(name);
+}
+async function hsnOpenFinancial(name){
+ const spec=hsnFinancialModules[name];if(!spec||!user)return;
+ try{
+  const mod=await hsnGetFinancialModule(name);
+  if(view!==name||!user)return;
+  await mod[spec.method]();
+ }catch(error){if(view===name)hsnModuleError(spec.title,error);}
+}
+function hsnRenderFinancial(name){
+ const spec=hsnFinancialModules[name];if(!spec||!user)return;
+ const mod=window[spec.global];
+ if(typeof mod?.render!=='function'){hsnOpenFinancial(name);return;}
+ try{return mod.render();}catch(error){hsnModuleError(spec.title,error);}
+}
+
 /* Sugestões opcionais; usuários escolhem quais cadastrar. Nunca renomeia tipos existentes. */
 const recommendedTypes=[
  ['Energia elétrica','#f59e0b'],['Água e esgoto','#0ea5e9'],['Internet e telefonia','#6366f1'],
@@ -54,7 +107,6 @@ function el(tag,text,cls){const node=document.createElement(tag);if(text!==undef
 function button(text,action,cls='secondary'){const node=el('button',text,cls);node.type='button';node.addEventListener('click',action);return node;}
 async function operation(fn){if(busy)return;busy=true;document.querySelectorAll('button[type="submit"]').forEach(b=>b.disabled=true);try{requireOnline();await fn();}catch(e){failure(e);}finally{busy=false;document.querySelectorAll('button[type="submit"]').forEach(b=>b.disabled=false);}}
 function resetPrivate(){
- window.HSN_SEND?.reset();
  HSN_THEME.reset();
  window.HSN_FINANCE?.reset();loadToken++;user=null;rows=[];templates=[];editing=null;waSupplier=null;$('records').replaceChildren();$('fields').replaceChildren();$('wa-text').value='';$('password').value='';$('editor').close();$('whatsapp').close();$('app').hidden=true;$('login').hidden=false;$('logout').hidden=true;}
 async function acceptSession(session){
@@ -64,10 +116,8 @@ async function acceptSession(session){
 }
 async function load(){
  loadToken++;
- if(view==='communications'){if(user)HSN_SEND.show('all');return;}
- if(view==='sicoob_collections'){if(user)HSN_SEND.show('collection');return;}
+ if(view==='communications'||view==='sicoob_collections'||view==='billing_send'){if(user)hsnOpenFinancial(view);return;}
  if(view==='zoho_connect'){if(user)HSN_ZOHO.show();return;}
- if(view==='billing_send'){if(user)HSN_SEND.show('billing');return;}
  if(window.HSN_FINANCE?.handles(view))return HSN_FINANCE.load(view);
  if(!user)return;const token=++loadToken;const current=view;$('records').replaceChildren(el('p','Carregando…'));
  try{requireOnline();const [a,b]=await Promise.all([db.from(current).select('*').order(current==='suppliers'?'legal_name':current==='account_types'?'name':'title'),db.from('message_templates').select('*').order('title')]);const data=check(a),messages=check(b);if(token!==loadToken||!user||current!==view)return;rows=data;templates=messages;render();}
@@ -76,10 +126,9 @@ async function load(){
 function render(){
  HSN_THEME.describe(view);
  $('search').closest('.search-wrap').hidden=false;
- if(view==='communications')return HSN_SEND.show('all');
- if(view==='sicoob_collections')return HSN_SEND.show('collection');
+ if(view==='communications'||view==='sicoob_collections')return hsnRenderFinancial(view);
  if(view==='zoho_connect')return HSN_ZOHO.show();
- if(view==='billing_send')return HSN_SEND.show('billing');
+ if(view==='billing_send')return hsnOpenFinancial(view);
  if(window.HSN_FINANCE?.handles(view))return HSN_FINANCE.render();
  $('new').hidden=false;HSN_PHASE3.clearCalendar();$('new').textContent='Novo cadastro';$('finance-controls').replaceChildren();$('summary').replaceChildren();$('calendar-board').replaceChildren();
  $('view-title').textContent=titles[view];document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
