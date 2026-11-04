@@ -1,0 +1,42 @@
+/* Financeiro HSN 9.4 — compactação não destrutiva + autocomplete integrado. */
+.hsn94-email-host{position:relative;min-width:0;display:block;width:100%;isolation:isolate}
+.hsn94-email-host>input,.hsn94-email-host>textarea{width:100%!important;min-width:0!important;margin:0!important;box-sizing:border-box}
+.hsn94-email-dropdown{position:absolute;z-index:110;top:calc(100% + 4px);left:0;right:0;min-width:min(100%,230px);max-height:275px;overflow:auto;display:grid;gap:2px;padding:6px;border:1px solid rgba(148,163,184,.42);border-radius:11px;box-shadow:0 12px 32px rgba(10,20,30,.24);background:var(--surface,#fff);color:var(--text,var(--fg,#1e293b))}
+.hsn94-email-dropdown[hidden]{display:none!important}
+.hsn94-email-caption{font-size:.7rem;letter-spacing:.02em;opacity:.7;padding:4px 7px}
+.hsn94-email-option{width:100%;min-height:40px;display:grid!important;gap:2px!important;padding:7px 9px!important;text-align:left!important;border:0!important;border-radius:8px!important;background:transparent!important;color:inherit!important;cursor:pointer}
+.hsn94-email-option:hover,.hsn94-email-option.is-active{background:rgba(110,142,171,.19)!important}
+.hsn94-email-option strong{font-size:.81rem;font-weight:650;overflow-wrap:anywhere}
+.hsn94-email-option small{font-size:.72rem;opacity:.7;overflow-wrap:anywhere}
+.hsn94-email-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+.hsn94-email-chip{display:inline-flex;align-items:center;max-width:100%;gap:5px;border-radius:6px;padding:2px 5px 2px 8px;background:rgba(100,116,139,.14);border:1px solid rgba(148,163,184,.25);font-size:.71rem;overflow-wrap:anywhere}
+.hsn94-email-chip span{min-width:0;overflow-wrap:anywhere}
+.hsn94-email-chip-remove{display:grid!important;place-items:center;min-height:20px!important;min-width:20px!important;padding:0!important;border-radius:5px!important;border:none!important;background:transparent!important;color:inherit!important;font-size:1.15rem!important;cursor:pointer}
+.hsn94-email-chip-remove:hover{background:rgba(148,163,184,.2)!important}
+.hsn94-billing-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:10px}
+.hsn94-billing-grid>.hsn-billing-label{margin:0!important}
+.hsn94-billing-grid>label>input{min-width:0}
+.hsn94-queue{margin-top:10px;padding:12px;border-radius:13px;border:1px solid rgba(148,163,184,.27);background:rgba(127,148,165,.06)}
+.hsn94-queue-head{display:flex;justify-content:space-between;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:7px}.hsn94-queue-head h3{font-size:.94rem!important;margin:0!important}.hsn94-queue-head small{font-size:.74rem;opacity:.75}
+.hsn94-queue-list{display:grid;gap:6px;margin:7px 0}
+.hsn94-queue-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px;border:1px solid rgba(148,163,184,.24);border-radius:9px;min-width:0}
+.hsn94-queue-row>div:first-child{display:grid;gap:3px;min-width:0;flex:1}
+.hsn94-queue-row strong{font-size:.8rem;overflow-wrap:anywhere}
+.hsn94-queue-row small{font-size:.72rem;opacity:.75;overflow-wrap:anywhere}
+.hsn94-queue-row>div:last-child{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.hsn94-queue-state{border-radius:5px;background:rgba(148,163,184,.16);padding:4px 7px;font-size:.7rem;white-space:nowrap}
+.hsn94-queue-state.sent{color:#268c60;background:rgba(16,185,129,.12)}
+.hsn94-queue-state.unknown{color:#bd7636;background:rgba(250,176,75,.12)}
+.hsn94-queue-row button,.hsn94-queue-actions button{min-height:34px!important;padding:6px 10px!important;font-size:.77rem!important}
+.hsn94-queue-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.hsn94-queue-note{font-size:.73rem;opacity:.77;margin:7px 0 1px}
+.hsn-billing-simple{max-width:1240px!important}.hsn-billing-simple .hsn-billing-compose,.hsn-billing-simple .hsn-billing-docs,.hsn-billing-simple .hsn-billing-send-area,.hsn-billing-simple .hsn-billing-signature,.hsn-billing-simple .hsn-billing-history-section{padding:12px 15px!important;margin:8px 0!important}
+.hsn-billing-simple h3{font-size:.98rem!important;margin:0 0 8px!important}.hsn-billing-simple .hsn-billing-top{gap:10px!important}
+.sicoob-workspace .sicoob-card{padding:12px!important;margin-bottom:8px!important}
+.sicoob-workspace .sicoob-card-details{gap:7px!important}.sicoob-workspace .sicoob-card-actions{gap:6px!important}
+.sicoob-workspace .sicoob-history-table th,.sicoob-workspace .sicoob-history-table td{padding:7px 8px!important}
+.sicoob-workspace .sicoob-shared-contacts{margin:5px 0!important}
+.hsn93-root .hsn93-stat{padding:10px 12px!important}.hsn93-root .hsn93-kpis{gap:8px!important}.hsn93-root .hsn93-timeline,.hsn93-root .hsn93-panel{padding:11px!important}
+@media(max-width:760px){.hsn94-billing-grid{grid-template-columns:1fr}.hsn94-queue-row{align-items:flex-start;flex-direction:column}.hsn94-email-dropdown{max-height:220px}}
+.sicoob-workspace .sicoob-actions select{min-height:35px;padding:6px 9px;border-radius:8px;border:1px solid rgba(148,163,184,.32);max-width:235px;background:var(--surface,#fff);color:inherit;font-size:.78rem}
+.hsn94-batch-status{margin:7px 0;padding:8px 10px;border-radius:9px;border:1px solid rgba(148,163,184,.2);background:rgba(148,163,184,.1);font-size:.77rem}
