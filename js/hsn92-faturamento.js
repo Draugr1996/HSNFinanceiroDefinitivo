@@ -10,7 +10,8 @@ const isEmail=s=>/^[^\s@;,]+@[^\s@;,]+\.[^\s@;,]+$/.test(s);
 const fmtSize=n=>n>=1048576?(n/1048576).toFixed(2)+' MB':Math.max(1,Math.round(n/1024))+' KB';
 const subject=nf=>'Hotel Serra Negra | Envio de faturamento'+(nf?' | NF nº '+nf:'');
 const message=nf=>`Prezados(as),\n\nEncaminhamos, em anexo, os documentos referentes ao faturamento${nf?' da Nota Fiscal nº '+nf:''}, para conferência, registro e programação do pagamento, observadas as condições e os prazos acordados.\n\nA documentação disponibilizada poderá conter a nota fiscal, o extrato de hospedagem e o boleto bancário, conforme os arquivos anexados. Solicitamos, por gentileza, a confirmação do recebimento e permanecemos à disposição caso seja necessária alguma informação complementar ou ajuste.\n\nAgradecemos a atenção e a parceria.\n\nAtenciosamente,\nVanderson Santos\nSupervisor Administrativo Financeiro\nHotel Serra Negra\n${SENDER}`;
-let recipientInput,nfInput,fileInput,signatureInput,files=[],signatureFile=null,sendBtn,status,historyNode,savedNode,savedCount,savedSearch,contactsPanel,csvInput,previewSubject,previewBody,signPreview,busy=false,uncertain=false;
+let recipientInput,nfInput,companyInput,fileInput,signatureInput,files=[],signatureFile=null,sendBtn,status,historyNode,savedNode,savedCount,savedSearch,contactsPanel,csvInput,previewSubject,previewBody,signPreview,busy=false,uncertain=false;
+let billingQueue=[],queueNode,queueSendButton,emailAssistant;
 let savedCache=[];
 let historyRecords=[],historyExpanded=false,historyCountNode;
 const say=(msg,kind='')=>{if(!status)return;status.textContent=msg;status.dataset.kind=kind;};
@@ -106,6 +107,7 @@ async function saveRecipients(list,{silent=false}={}){
   const {error}=await client.from('hsn_billing_recipients').upsert(rows,{onConflict:'owner_id,company'});
   if(error)throw Error('Não foi possível salvar os e-mails: '+error.message);
  }
+ window.HSN_EMAIL_ASSIST?.invalidate();
  await refreshSaved();
  if(!silent&&contactsPanel)contactsPanel.open=false;
 }
@@ -240,12 +242,88 @@ async function refreshHistory(){
   renderHistory();
  }catch(_){historyRecords=[];historyNode.replaceChildren(make('p','Histórico indisponível. Verifique a conexão com o Supabase.','hsn-billing-muted'));if(historyCountNode)historyCountNode.textContent='Histórico indisponível';}
 }
-async function send(){if(busy||uncertain)return;let to,nf;try{to=getEmails();nf=getNF();validateSelection(files);}catch(e){say(e.message,'error');return;}
-const list=files.map(f=>'• '+f.name+' ('+fmtSize(f.size)+')').join('\n');if(!confirm('CONFIRMAR ENVIO DE FATURAMENTO\n\nDestinatários:\n'+to.join('; ')+'\n\nArquivos:\n'+list+'\n\nAssunto:\n'+subject(nf)+'\n\n'+(signatureFile?'Inclui assinatura digitalizada cadastrada.':'Assinatura textual de Vanderson Santos.')+'\n\nEnviar agora pelo Zoho Mail?'))return;
-busy=true;sendBtn.disabled=true;say('Enviando documentos pelo Zoho Mail…');try{if(!navigator.onLine)throw Error('Sem internet.');const client=getClient();if(!client)throw Error('Supabase indisponível.');const reference=await fingerprint(to,files,nf);const form=new FormData();form.append('request_id',crypto.randomUUID());form.append('company','Faturamento avulso');form.append('reference',reference);form.append('to',to.join(';'));form.append('cc','');form.append('nf_number',nf);form.append('subject',subject(nf));form.append('content',message(nf));form.append('confirm','ENVIAR_FATURAMENTO');const slots=['boleto','extrato','nota'];files.forEach((f,i)=>form.append(slots[i],f,f.name));if(signatureFile)form.append('signature_image',signatureFile,signatureFile.name);
-const {data,error}=await client.functions.invoke('zoho-billing-mail',{body:form});if(error){let detail='';try{if(error.context?.json)detail=(await error.context.json()).error||'';}catch(_){}throw Error(detail||error.message||'Resposta não confirmada.');}if(!data?.success)throw Error(data?.error||'O Zoho não confirmou o envio.');
-files=[];fileInput.value='';showFiles();say('Faturamento enviado! Zoho confirmou o envio para '+to.join('; ')+'.'+(data?.signature_inline_warning?' Confira também a visualização da assinatura em Enviados.':''),'success');try{await saveRecipients(to);}catch(_){say('Faturamento enviado pelo Zoho, mas os e-mails não foram salvos. Use “Salvar e-mails”.','error');}await refreshHistory();}
-catch(e){uncertain=true;say('Envio não confirmado: '+e.message+' Confira a pasta Enviados do Zoho ANTES de repetir, para evitar duplicidade.','error');}finally{busy=false;sendBtn.disabled=uncertain;}}
+function prepareTask(){
+ const to=getEmails(),nf=getNF();validateSelection(files);
+ const company=(companyInput?.value||'').trim();
+ if(company.length>160)throw Error('Nome da empresa com mais de 160 caracteres.');
+ return {id:crypto.randomUUID(),requestId:crypto.randomUUID(),to,nf,company:company||'Faturamento avulso',files:files.slice(),signature:signatureFile,status:'ready',error:''};
+}
+function taskSummary(task){return `${task.company} | NF ${task.nf||'não informada'} | ${task.to.join('; ')} | ${task.files.map(f=>f.name).join(', ')}`;}
+async function dispatchTask(task){
+ if(!navigator.onLine)throw Error('Sem internet. Nenhum envio foi iniciado.');
+ validateSelection(task.files);
+ const client=getClient();if(!client)throw Error('Supabase indisponível.');
+ const ref=await fingerprint(task.to,task.files,task.nf);
+ const form=new FormData();form.append('request_id',task.requestId);form.append('company',task.company);form.append('reference',ref);
+ form.append('to',task.to.join(';'));form.append('cc','');form.append('nf_number',task.nf);
+ form.append('subject',subject(task.nf));form.append('content',message(task.nf));form.append('confirm','ENVIAR_FATURAMENTO');
+ ['boleto','extrato','nota'].forEach((slot,i)=>{if(task.files[i])form.append(slot,task.files[i],task.files[i].name);});
+ if(task.signature)form.append('signature_image',task.signature,task.signature.name);
+ const {data,error}=await client.functions.invoke('zoho-billing-mail',{body:form});
+ if(error){let detail='';try{if(error.context?.json)detail=(await error.context.json()).error||'';}catch(_){}throw Error(detail||error.message||'Resposta não confirmada.');}
+ if(!data?.success)throw Error(data?.error||'O Zoho não confirmou o envio.');
+ return data;
+}
+function clearDraft(){files=[];fileInput.value='';recipientInput.value='';nfInput.value='';if(companyInput)companyInput.value='';showFiles();updatePreview();emailAssistant?.refresh();renderSaved();}
+async function send(){
+ if(busy||uncertain)return;let task;
+ try{task=prepareTask();}catch(e){say(e.message,'error');return;}
+ const list=task.files.map(f=>'• '+f.name+' ('+fmtSize(f.size)+')').join('\n');
+ if(!confirm('CONFERIR FATURAMENTO\n\nEmpresa: '+task.company+'\nNF: '+(task.nf||'não informada')+'\nDestinatários: '+task.to.join('; ')+'\n\nArquivos:\n'+list+'\n\nAssunto: '+subject(task.nf)+'\n\nAutoriza enviar agora pelo Zoho Mail?'))return;
+ busy=true;sendBtn.disabled=true;say('Enviando documentos pelo Zoho Mail…');
+ try{const data=await dispatchTask(task);clearDraft();say('Zoho confirmou o envio para '+task.to.join('; ')+'.'+(data?.signature_inline_warning?' Confira a imagem da assinatura em Enviados.':''),'success');
+  try{await saveRecipients(task.to);}catch(_){say('Faturamento enviado, mas os contatos não foram salvos.','error');}
+  await refreshHistory();
+ }catch(e){uncertain=true;say('Resultado não confirmado: '+e.message+' Verifique a pasta Enviados e o histórico antes de repetir.','error');}
+ finally{busy=false;sendBtn.disabled=uncertain;}
+}
+async function addToBatch(){
+ if(busy||uncertain)return;
+ try{
+  if(billingQueue.filter(x=>x.status==='ready').length>=10)throw Error('Máximo de 10 faturamentos preparados por lote.');
+  const item=prepareTask();item.fingerprint=await fingerprint(item.to,item.files,item.nf);
+  if(billingQueue.some(x=>x.fingerprint===item.fingerprint))throw Error('Estes documentos e destinatários já constam na lista.');
+  billingQueue.push(item);clearDraft();drawBatch();say('Faturamento adicionado à lista. Ainda não foi enviado.','success');
+ }catch(e){say(e.message,'error');}
+}
+function drawBatch(){if(!queueNode)return;
+ queueNode.replaceChildren();
+ const header=make('div',undefined,'hsn94-queue-head');const ready=billingQueue.filter(x=>x.status==='ready');
+ header.append(make('h3','Lote de faturamentos'),make('small',ready.length+' pendente(s) · '+billingQueue.filter(x=>x.status==='sent').length+' enviado(s)'));
+ queueNode.append(header);
+ const list=make('div',undefined,'hsn94-queue-list');
+ for(const task of billingQueue){const row=make('div',undefined,'hsn94-queue-row'),details=make('div');
+  details.append(make('strong',task.company+' · NF '+(task.nf||'não informada')),make('small',task.to.join('; ')+' · '+task.files.map(f=>f.name).join(' / ')));
+  const actions=make('div');actions.append(make('span',({ready:'Aguardando',sending:'Enviando…',sent:'Enviado',unknown:'Conferir no Zoho'})[task.status]||task.status,'hsn94-queue-state '+task.status));
+  if(task.status==='ready'){const rm=make('button','Remover','secondary');rm.type='button';rm.disabled=busy;rm.onclick=()=>{billingQueue=billingQueue.filter(x=>x.id!==task.id);drawBatch();};actions.append(rm);}
+  if(task.error)details.append(make('small',task.error));row.append(details,actions);list.append(row);
+ }
+ if(!billingQueue.length)list.append(make('p','Nenhum faturamento preparado. Monte cada envio e clique em “Adicionar ao lote”.','hsn94-queue-note'));
+ queueNode.append(list);
+ const controls=make('div',undefined,'hsn94-queue-actions');
+ queueSendButton=make('button','Conferir e enviar '+ready.length+' faturamento(s)');queueSendButton.type='button';queueSendButton.disabled=busy||uncertain||!ready.length;queueSendButton.onclick=sendPreparedBatch;controls.append(queueSendButton);
+ const clear=make('button','Limpar enviados','secondary');clear.type='button';clear.disabled=busy;clear.onclick=()=>{billingQueue=billingQueue.filter(x=>x.status!=='sent');drawBatch();};controls.append(clear);
+ queueNode.append(controls,make('p','Envio sequencial, com confirmação antecipada e resultado por empresa. Se um resultado for incerto, o lote para — nunca reenvia automaticamente.','hsn94-queue-note'));
+}
+async function sendPreparedBatch(){
+ if(busy||uncertain)return;const ready=billingQueue.filter(x=>x.status==='ready');if(!ready.length)return;
+ const text=ready.map((t,i)=>`${i+1}. ${taskSummary(t)}`).join('\n\n');
+ if(!confirm('CONFERÊNCIA FINAL — FATURAMENTOS EM LOTE\n\n'+text+'\n\nVocê conferiu empresa, e-mails e documentos de cada envio?\n\nOK autoriza '+ready.length+' envio(s) SEQUENCIAIS pelo Zoho.'))return;
+ busy=true;sendBtn.disabled=true;drawBatch();let sent=0;const saved=[];
+ try{
+  for(const task of ready){
+   task.status='sending';drawBatch();say('Enviando '+(sent+1)+' de '+ready.length+': '+task.company);
+   try{await dispatchTask(task);task.status='sent';sent++;saved.push(...task.to);}
+   catch(e){task.status='unknown';task.error=(e?.message||'Resposta incerta')+' · Confira Enviados no Zoho antes de qualquer nova tentativa.';
+    uncertain=true;say('Lote interrompido: '+sent+' confirmado(s). '+task.error,'error');break;
+   }drawBatch();
+  }
+  if(saved.length)try{await saveRecipients(saved,{silent:true});}catch(_){say('Envios confirmados, mas não foi possível salvar alguns contatos.','error');}
+  await refreshHistory();
+  if(!uncertain)say('Lote concluído: '+sent+' faturamento(s) confirmados pelo Zoho.','success');
+ }finally{busy=false;sendBtn.disabled=uncertain;drawBatch();}
+}
+
 function show(){const client=getClient(),app=$('app');if(!client||!app||app.hidden)return;$('new').hidden=true;const search=$('search')?.closest('.search-wrap');if(search)search.hidden=true;$('view-title').textContent='Envio de faturamento';$('view-description').textContent='Escolha os destinatários, informe a NF e anexe os documentos já emitidos.';for(const id of ['summary','finance-controls','calendar-board','records'])$(id).replaceChildren();const panel=make('section',undefined,'hsn-billing hsn-billing-simple');const header=make('div',undefined,'hsn-billing-top'),info=make('div');info.append(make('small','HOTEL SERRA NEGRA · ZOHO MAIL','hsn-billing-kicker'),make('h2','Enviar faturamento'),make('p','E-mails salvos, número da NF no assunto, mensagem formal e assinatura de Vanderson Santos.'));header.append(info,make('div',SENDER+' · v9.2.8','hsn-billing-sender'));panel.append(header);
 const form=make('section',undefined,'hsn-billing-compose');form.append(make('h3','1. Destinatários e nota fiscal'));const label=make('label','E-mail ou e-mails de destino','hsn-billing-label');recipientInput=make('textarea');recipientInput.rows=1;recipientInput.placeholder='financeiro@empresa.com.br; contas@empresa.com.br';recipientInput.addEventListener('input',renderSaved);label.append(recipientInput);form.append(label);
 const emailTools=make('div',undefined,'hsn-billing-contact-toolbar');
@@ -261,10 +339,10 @@ const panelBody=make('div',undefined,'hsn-billing-contacts-body');
 savedSearch=make('input');savedSearch.type='search';savedSearch.placeholder='Buscar e-mail salvo…';savedSearch.setAttribute('aria-label','Buscar contatos salvos');savedSearch.addEventListener('input',renderSaved);panelBody.append(savedSearch);
 savedNode=make('div',undefined,'hsn-billing-contacts-results');panelBody.append(savedNode);
 panelBody.append(make('p','Contatos importados do Zoho, salvos no faturamento e cadastrados nas cobranças Sicoob.','hsn-billing-muted'));
-contactsPanel.append(panelBody);form.append(contactsPanel);const nLabel=make('label','Número da nota fiscal (opcional)','hsn-billing-label');nfInput=make('input');nfInput.type='text';nfInput.maxLength=35;nfInput.placeholder='Ex.: 1297';nfInput.autocomplete='off';nfInput.addEventListener('input',updatePreview);nLabel.append(nfInput);form.append(nLabel,make('p','O número aparecerá automaticamente no assunto e no corpo da mensagem.','hsn-billing-muted'));panel.append(form);
+contactsPanel.append(panelBody);form.append(contactsPanel);const nLabel=make('label','Número da nota fiscal (opcional)','hsn-billing-label');nfInput=make('input');nfInput.type='text';nfInput.maxLength=35;nfInput.placeholder='Ex.: 1297';nfInput.autocomplete='off';nfInput.addEventListener('input',updatePreview);nLabel.append(nfInput);const cLabel=make('label','Empresa (para identificar o envio)','hsn-billing-label');companyInput=make('input');companyInput.type='text';companyInput.maxLength=160;companyInput.placeholder='Ex.: Empresa cliente';cLabel.append(companyInput);const twoFields=make('div',undefined,'hsn94-billing-grid');twoFields.append(cLabel,nLabel);form.append(twoFields,make('p','O número da NF aparece no assunto e no corpo; a empresa organiza o histórico.','hsn-billing-muted'));panel.append(form);
 const docs=make('section',undefined,'hsn-billing-docs');docs.append(make('h3','2. Documentos já emitidos'),make('p','Selecione na pasta do computador até três PDFs, XMLs ou imagens (boleto, extrato e NF).','hsn-billing-muted'));fileInput=make('input');fileInput.type='file';fileInput.multiple=true;fileInput.accept='.pdf,.xml,.jpg,.jpeg,.png';fileInput.hidden=true;fileInput.addEventListener('change',chooseFiles);const pick=make('button','Selecionar arquivos','secondary');pick.type='button';pick.addEventListener('click',()=>fileInput.click());docs.append(pick,fileInput);const picked=make('div',undefined,'hsn-billing-selected');picked.id='hsn-billing-selected-files';docs.append(picked);panel.append(docs);
 const signature=make('section',undefined,'hsn-billing-signature');signature.append(make('h3','3. Sua assinatura digitalizada'),make('p','Nome e cargo já aparecem automaticamente no final. Se desejar, escolha uma imagem PNG/JPG da sua assinatura manuscrita (até 750 KB). A imagem fica salva somente neste navegador.','hsn-billing-muted'));signatureInput=make('input');signatureInput.type='file';signatureInput.accept='.png,.jpg,.jpeg';signatureInput.hidden=true;signatureInput.addEventListener('change',chooseSignature);const signActions=make('div',undefined,'hsn-billing-email-tools');const choose=make('button','Selecionar imagem da assinatura','secondary');choose.type='button';choose.addEventListener('click',()=>signatureInput.click());const remove=make('button','Remover assinatura','secondary');remove.type='button';remove.addEventListener('click',removeSignature);signActions.append(choose,remove);signature.append(signActions,signatureInput);signPreview=make('div',undefined,'hsn-billing-signature-preview');signature.append(signPreview,make('p','Assinatura digitalizada é uma imagem ilustrativa da assinatura, não assinatura com certificado ICP-Brasil. Faça um envio de teste para conferir como aparece no Zoho.','hsn-billing-muted'));panel.append(signature);
-const sendArea=make('section',undefined,'hsn-billing-send-area');sendArea.append(make('h3','4. Enviar pelo Zoho Mail'));const details=make('details',undefined,'hsn-billing-template'),summary=make('summary','Visualizar mensagem automática'),preview=make('div',undefined,'hsn-billing-email-preview');previewSubject=make('strong');previewBody=make('pre');preview.append(previewSubject,previewBody);details.append(summary,preview);sendArea.append(details);sendBtn=make('button','Enviar faturamento','hsn-billing-main-send');sendBtn.type='button';sendBtn.addEventListener('click',send);sendArea.append(sendBtn,make('p','O envio só ocorre após confirmar destinatários, NF e documentos.','hsn-billing-muted'));status=make('p','Nenhum faturamento enviado nesta operação.','hsn-billing-message');status.setAttribute('role','status');status.setAttribute('aria-live','polite');sendArea.append(status);const reset=make('button','Novo envio','secondary');reset.type='button';reset.addEventListener('click',()=>{
+const sendArea=make('section',undefined,'hsn-billing-send-area');sendArea.append(make('h3','4. Enviar pelo Zoho Mail'));const details=make('details',undefined,'hsn-billing-template'),summary=make('summary','Visualizar mensagem automática'),preview=make('div',undefined,'hsn-billing-email-preview');previewSubject=make('strong');previewBody=make('pre');preview.append(previewSubject,previewBody);details.append(summary,preview);sendArea.append(details);sendBtn=make('button','Enviar faturamento','hsn-billing-main-send');sendBtn.type='button';sendBtn.addEventListener('click',send);const addBatchButton=make('button','+ Adicionar ao lote','secondary');addBatchButton.type='button';addBatchButton.addEventListener('click',addToBatch);const act=make('div',undefined,'hsn94-queue-actions');act.append(sendBtn,addBatchButton);sendArea.append(act,make('p','Envio individual ou preparação de vários faturamentos para uma única conferência. Nada é disparado sem confirmação.','hsn-billing-muted'));status=make('p','Nenhum faturamento enviado nesta operação.','hsn-billing-message');status.setAttribute('role','status');status.setAttribute('aria-live','polite');sendArea.append(status);const reset=make('button','Novo envio','secondary');reset.type='button';reset.addEventListener('click',()=>{
  if(busy)return;
  // Se o resultado do envio foi incerto, obrigar a conferencia no Zoho para evitar reenvio acidental.
  if(uncertain&&!confirm('O envio anterior não foi confirmado. Você já conferiu a pasta Enviados do Zoho antes de começar um novo envio?'))return;
@@ -291,6 +369,6 @@ const sendArea=make('section',undefined,'hsn-billing-send-area');sendArea.append
  start.scrollIntoView({behavior:'auto',block:'start',inline:'nearest'});
  // Foco sem nova rolagem: cursor pronto para digitar o proximo destinatario.
  recipientInput.focus({preventScroll:true});
-});sendArea.append(reset);panel.append(sendArea);
-const historySection=make('section',undefined,'hsn-billing-history-section');const historyHeader=make('div',undefined,'hsn-billing-history-header');historyHeader.append(make('h3','Últimos envios'));historyCountNode=make('span','Carregando…','hsn-billing-history-count');historyHeader.append(historyCountNode);historySection.append(historyHeader);historyNode=make('div',undefined,'hsn-billing-history-list');historySection.append(historyNode);panel.append(historySection);$('records').append(panel);document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view==='billing_send'));showFiles();updatePreview();updateSignatureView();refreshSaved();loadSignature();refreshHistory();}
-return {show,parseCSV:parseDelimitedCSV};})();
+});sendArea.append(reset);panel.append(sendArea);queueNode=make('section',undefined,'hsn94-queue');panel.append(queueNode);drawBatch();
+const historySection=make('section',undefined,'hsn-billing-history-section');const historyHeader=make('div',undefined,'hsn-billing-history-header');historyHeader.append(make('h3','Últimos envios'));historyCountNode=make('span','Carregando…','hsn-billing-history-count');historyHeader.append(historyCountNode);historySection.append(historyHeader);historyNode=make('div',undefined,'hsn-billing-history-list');historySection.append(historyNode);panel.append(historySection);$('records').append(panel);window.HSN_EMAIL_ASSIST?.invalidate();const ac=getClient();if(ac){ac.auth.getUser().then(({data})=>{if(recipientInput?.isConnected)emailAssistant=window.HSN_EMAIL_ASSIST?.bind(recipientInput,{client:ac,userId:data?.user?.id});}).catch(()=>{});}document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view==='billing_send'));showFiles();updatePreview();updateSignatureView();refreshSaved();loadSignature();refreshHistory();}
+return {show};})();

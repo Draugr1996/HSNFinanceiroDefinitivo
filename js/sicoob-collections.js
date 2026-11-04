@@ -1,13 +1,14 @@
 /* Cobranças Sicoob: conferência humana obrigatória. Sem credenciais Zoho no navegador. */
 window.HSN_SICOOB=(()=>{'use strict';
 let items=[], contacts=[], dispatches=[], historyError="", ready=false, busy=false, selected=new Set(), activeTab="pending";
-let sharedAddressBook=[],sharedContactError='';
+let sharedAddressBook=[],sharedContactError='',batchProgress='',batchProgressNode;
+function reportBatchProgress(msg){batchProgress=msg;if(batchProgressNode){batchProgressNode.textContent=msg;batchProgressNode.hidden=!msg;}}
 const $=id=>document.getElementById(id), node=(tag,txt,cls)=>{const e=document.createElement(tag);if(txt!==undefined)e.textContent=txt;if(cls)e.className=cls;return e;};
 const button=(txt,fn)=>{const b=node('button',txt,'secondary');b.type='button';b.onclick=fn;return b;};
 const fmt=n=>Number(n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const iso=s=>{s=String(s||'').trim();if(/^\d{2}\/\d{2}\/\d{4}$/.test(s)){const [d,m,y]=s.split('/');return `${y}-${m}-${d}`;}return /^\d{4}-\d{2}-\d{2}$/.test(s)?s:'';};
 const money=s=>Number(String(s||'0').replace(/[^\d,.-]/g,'').replace(/\.(?=\d{3}(\D|$))/g,'').replace(',','.'));
-function csv(text){const header=text.split(/\r?\n/).find(l=>/sacado/i.test(l)&&/vencimento/i.test(l))||text.split(/\r?\n/)[0];const delim=[';',',','\t'].sort((a,b)=>header.split(b).length-header.split(a).length)[0];const rows=[];let row=[],field='',quote=false;for(let i=0;i<text.length;i++){const c=text[i];if(c==='"'){if(quote&&text[i+1]==='"'){field+='"';i++;}else quote=!quote;}else if(c===delim&&!quote){row.push(field);field='';}else if((c==='\n'||c==='\r')&&!quote){if(c==='\r'&&text[i+1]==='\n')i++;row.push(field);if(row.some(x=>x.trim()))rows.push(row);row=[];field='';}else field+=c;}row.push(field);if(row.some(x=>x.trim()))rows.push(row);return rows;}
+function csv(text){const rows=[];let row=[],field='',quote=false;for(let i=0;i<text.length;i++){const c=text[i];if(c==='"'){if(quote&&text[i+1]==='"'){field+='"';i++;}else quote=!quote;}else if(c===','&&!quote){row.push(field);field='';}else if((c==='\n'||c==='\r')&&!quote){if(c==='\r'&&text[i+1]==='\n')i++;row.push(field);if(row.some(x=>x.trim()))rows.push(row);row=[];field='';}else field+=c;}row.push(field);if(row.some(x=>x.trim()))rows.push(row);return rows;}
 const clean=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
 function parse(rows){
  const parsed=[];let cols=null;
@@ -15,17 +16,17 @@ function parse(rows){
   const heads=r.map(clean);
   if(heads.some(v=>v==='sacado')&&heads.some(v=>v.includes('vencimento'))){
    const ix=s=>heads.findIndex(v=>v.includes(s));
-   cols={name:ix('sacado'),our:ix('nosso numero'),your:heads.findIndex(v=>v.includes('numero do documento')||v.includes('numero documento')||v.includes('seu numero')),due:ix('vencimento'),amount:ix('valor'),state:heads.findIndex(v=>/situacao|status/.test(v))};
+   cols={name:ix('sacado'),our:ix('nosso numero'),your:heads.findIndex(v=>v.includes('numero do documento')||v.includes('numero documento')||v.includes('seu numero')),due:ix('vencimento'),amount:ix('valor')};
    if([cols.name,cols.our,cols.due,cols.amount].some(v=>v<0))throw Error('Cabeçalho incompleto.');
    continue;
   }
-  if(!cols)continue;const state=cols.state>=0?clean(r[cols.state]):'';if(/parcial/.test(state))throw Error('Há pagamento parcial no relatório. Confira o saldo no banco antes de cobrar.');if(/cancel|baixad/.test(state)&&!/liquid|pago|nao/.test(state))throw Error('Relatório com títulos cancelados/baixados. Confira esses títulos no banco e retire-os do arquivo de pendências antes de importar.');const reportedPaid=/liquid|pago/.test(state)&&!/\bnao\b|pendente|aberto|a pagar|parcial/.test(state);
+  if(!cols)continue;
   const company=String(r[cols.name]||'').trim(),reference=String(r[cols.our]||'').trim(),date=iso(r[cols.due]),value=money(r[cols.amount]);
   if(!company||!reference||!date||!Number.isFinite(value)||value<=0)continue;
-  parsed.push({reported_paid:reportedPaid,company,reference,external_reference:cols.your>=0?String(r[cols.your]||'').trim():'',due_date:date,amount:value});
+  parsed.push({company,reference,external_reference:cols.your>=0?String(r[cols.your]||'').trim():'',due_date:date,amount:value});
  }
  if(!cols)throw Error('Cabeçalho Sicoob não encontrado.');
- const unique=new Map();for(const r of parsed){const key=r.reference+'|'+r.due_date,prior=unique.get(key);if(prior&&(prior.amount!==r.amount||prior.company!==r.company))throw Error('Relatório com dados conflitantes para o mesmo título. Confira o arquivo.');if(prior?.reported_paid)r.reported_paid=true;unique.set(key,r);}return [...unique.values()];
+ return [...new Map(parsed.map(x=>[x.reference+'|'+x.due_date,x])).values()];
 }
 function check(x){if(x.error)throw x.error;return x.data;}
 // Agenda compartilhada: consulta os e-mails do faturamento, inclusive importados do CSV do Zoho.
@@ -125,7 +126,7 @@ function installSharedPickerStyle(){
 }
 async function fetchData(){
  const [a,b,h]=await Promise.all([
-  db.from('sicoob_collections').select('*').eq('owner_id',user.id).order('due_date',{ascending:true}),
+  db.from('sicoob_collections').select('*').order('due_date',{ascending:true}),
   db.from('sicoob_contacts').select('*').eq('owner_id',user.id),
   db.from('sicoob_collection_dispatches').select('id,collection_id,owner_id,status,recipient_email,sent_at,created_at').eq('owner_id',user.id).order('created_at',{ascending:false}).limit(1000)
  ]);
@@ -142,9 +143,9 @@ const emailsFor=c=>String(c?.email||'').split(/[;,\n]+/).map(x=>x.trim()).filter
 const validEmail=x=>/^[^\s@;,]+@[^\s@;,]+\.[^\s@;,]+$/.test(x);
 function message(r){return `Prezados, bom dia!\n\nIdentificamos em nosso controle financeiro uma pendência referente ao boleto abaixo:\n\nEmpresa: ${r.company}\nNúmero do Documento: ${docNumber(r)||'[NÃO INFORMADO]'}\nVencimento: ${r.due_date.split('-').reverse().join('/')}\nValor original: ${fmt(r.amount)}\n\nSolicitamos, por gentileza, a verificação da pendência e, caso o pagamento já tenha sido realizado, o envio do respectivo comprovante para atualização de nossos registros.\n\nPermanecemos à disposição para quaisquer esclarecimentos.\n\nAtenciosamente,\nVanderson Santos\nSupervisor Administrativo Financeiro\nHotel Serra Negra\nfaturamento@hotelserranegra.com.br`;}
 const eligible=r=>r.status==='pending'&&emailsFor(contact(r.company)).length>0&&!!docNumber(r)&&r.due_date<new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});
-async function saveContact(company,primary,cc){const all=[primary.trim(),...cc.split(/[;,\n]+/).map(x=>x.trim()).filter(Boolean)];if(!all[0]||all.some(x=>!validEmail(x)))throw Error('Confira os endereços de e-mail em Para e CC.');if(new Set(all.map(x=>x.toLowerCase())).size!==all.length)throw Error('Há e-mails repetidos entre Para e CC.');check(await db.from('sicoob_contacts').upsert({owner_id:user.id,company,email:all.join('; ')},{onConflict:'owner_id,company'}));await fetchData();render();}
-async function importCsv(file){if(!file)return;try{const text=await file.text();const parsed=parse(csv(text.replace(/^\uFEFF/,'')));if(!parsed.length)throw Error('Nenhum boleto reconhecido.');const ok=confirm(`Foram encontrados ${parsed.length} títulos, totalizando ${fmt(parsed.reduce((s,r)=>s+r.amount,0))}.\n\nImportar o relatório? Títulos identificados explicitamente como PAGOS/LIQUIDADOS serão marcados pagos após esta confirmação. Os demais estados e valores existentes serão preservados. Confira o relatório original.`);if(!ok)return;const existing=new Set(items.map(x=>x.reference+'|'+x.due_date));const fresh=parsed.filter(x=>!existing.has(x.reference+'|'+x.due_date));const updates=parsed.filter(x=>existing.has(x.reference+'|'+x.due_date)&&x.external_reference&&x.external_reference!==items.find(y=>y.reference===x.reference&&y.due_date===x.due_date)?.external_reference);if(updates.length){for(const x of updates){const old=items.find(y=>y.reference===x.reference&&y.due_date===x.due_date);check(await db.from('sicoob_collections').update({external_reference:x.external_reference}).eq('id',old.id).eq('owner_id',user.id));}}for(const x of parsed.filter(x=>x.reported_paid)){const old=items.find(y=>y.reference===x.reference&&y.due_date===x.due_date);if(old&&old.status!=='paid')check(await db.from('sicoob_collections').update({status:'paid'}).eq('id',old.id).eq('owner_id',user.id));}if(fresh.length)check(await db.from('sicoob_collections').upsert(fresh.map(({reported_paid,...x})=>({...x,owner_id:user.id,status:reported_paid?'paid':'pending'})),{onConflict:'owner_id,reference,due_date'}));await fetchData();render();alert(`${fresh.length} títulos novos importados. ${parsed.length-fresh.length} já cadastrados; ${updates.length} número(s) de documento atualizado(s), pagamentos explicitamente informados no CSV foram aplicados após a sua confirmação.`);}catch(e){alert('Falha na importação: '+e.message);}}
-async function setStatus(r,status){if(!confirm(`Alterar ${r.company} / ${r.reference} para ${status==='paid'?'pago':'pendente'}? Confira a situação no Sicoob.`))return;try{check(await db.from('sicoob_collections').update({status}).eq('id',r.id).eq('owner_id',user.id));await fetchData();render();}catch(e){alert(e.message);}}
+async function saveContact(company,primary,cc){const all=[primary.trim(),...cc.split(/[;,\n]+/).map(x=>x.trim()).filter(Boolean)];if(!all[0]||all.some(x=>!validEmail(x)))throw Error('Confira os endereços de e-mail em Para e CC.');if(new Set(all.map(x=>x.toLowerCase())).size!==all.length)throw Error('Há e-mails repetidos entre Para e CC.');check(await db.from('sicoob_contacts').upsert({owner_id:user.id,company,email:all.join('; ')},{onConflict:'owner_id,company'}));window.HSN_EMAIL_ASSIST?.invalidate();await fetchData();render();}
+async function importCsv(file){if(!file)return;try{const text=await file.text();const parsed=parse(csv(text.replace(/^\uFEFF/,'')));if(!parsed.length)throw Error('Nenhum boleto reconhecido.');const ok=confirm(`Foram encontrados ${parsed.length} títulos, totalizando ${fmt(parsed.reduce((s,r)=>s+r.amount,0))}.\n\nImportar e atualizar títulos existentes? Os status atuais serão preservados.`);if(!ok)return;const existing=new Set(items.map(x=>x.reference+'|'+x.due_date));const fresh=parsed.filter(x=>!existing.has(x.reference+'|'+x.due_date));const updates=parsed.filter(x=>existing.has(x.reference+'|'+x.due_date)&&x.external_reference&&x.external_reference!==items.find(y=>y.reference===x.reference&&y.due_date===x.due_date)?.external_reference);if(updates.length){for(const x of updates){const old=items.find(y=>y.reference===x.reference&&y.due_date===x.due_date);check(await db.from('sicoob_collections').update({external_reference:x.external_reference}).eq('id',old.id));}}if(fresh.length)check(await db.from('sicoob_collections').upsert(fresh.map(x=>({...x,owner_id:user.id,status:'pending'})),{onConflict:'owner_id,reference,due_date'}));await fetchData();render();alert(`${fresh.length} títulos novos importados. ${parsed.length-fresh.length} já cadastrados; ${updates.length} número(s) de documento atualizado(s), sem alterar a situação dos boletos.`);}catch(e){alert('Falha na importação: '+e.message);}}
+async function setStatus(r,status){if(!confirm(`Alterar ${r.company} / ${r.reference} para ${status==='paid'?'pago':'pendente'}? Confira a situação no Sicoob.`))return;try{check(await db.from('sicoob_collections').update({status}).eq('id',r.id));await fetchData();render();}catch(e){alert(e.message);}}
 async function prepareIndividual(r){
  if(busy)return;
  busy=true;
@@ -182,7 +183,7 @@ async function sendBatch(){
  const targets=items.filter(r=>selected.has(r.id)&&eligible(r)&&!dispatches.some(d=>d.collection_id===r.id));
  if(!targets.length){alert('Nenhum boleto elegível. Confira vencimentos, pagamentos, documentos, destinatários e histórico.');return;}
  if(targets.length>5){alert('Para segurança, selecione no máximo 5 cobranças por lote. Divida os envios e confira os resultados antes do próximo.');return;}
- busy=true;let completed=0;
+ busy=true;let completed=0;reportBatchProgress('Conferindo '+targets.length+' boleto(s) com Supabase…');
  try{
   const previews=[];
   for(const r of targets){
@@ -192,13 +193,14 @@ async function sendBatch(){
     try{if(error?.context?.json)reason=(await error.context.json())?.error||reason;}catch(_e){}
     throw Error('Prévia de '+r.company+': '+reason);
    }
-   previews.push(data);
+   previews.push(data);reportBatchProgress('Conferidos '+previews.length+' de '+targets.length+' boleto(s).');
   }
   const lines=previews.map((x,i)=>`${i+1}. ${x.company} | Documento ${x.document_number} | ${fmt(x.amount)} | Venc.: ${x.due_date.split('-').reverse().join('/')}\n   PARA: ${x.to}\n   CC: ${(x.cc||[]).join('; ')||'(nenhum)'}`).join('\n\n');
   const amount=previews.reduce((s,r)=>s+Number(r.amount||0),0);
   if(!confirm('PRIMEIRA CONFERÊNCIA — LOTE SICOOB\n\n'+lines+'\n\n'+previews.length+' cobrança(s) · '+fmt(amount)+'\n\nNada foi enviado. Deseja prosseguir à autorização final?'))return;
   if(!confirm('CONFIRMAÇÃO FINAL — ENVIO REAL\n\nO Zoho enviará ATÉ '+previews.length+' e-mail(s) de cobrança para os endereços acima.\n\nVocê conferiu no Sicoob que TODOS estão vencidos e NÃO PAGOS e validou os destinatários?\n\nCANCELAR não envia nada. OK AUTORIZA o início do lote.'))return;
   for(const x of previews){
+   reportBatchProgress('Enviando '+(completed+1)+' de '+previews.length+' · '+x.company);
    // O servidor revalida status pendente, ausência de despacho e dados assinados em cada item.
    const {data,error}=await db.functions.invoke('zoho-send-mail',{body:{mode:'send_individual',collection_id:x.collection_id,approval_token:x.approval_token}});
    if(error||!data?.success){
@@ -206,7 +208,7 @@ async function sendBatch(){
     try{if(error?.context?.json)reason=(await error.context.json())?.error||reason;}catch(_e){}
     throw Error('Interrompido no boleto '+x.document_number+': '+reason+' NÃO reenvie este lote sem conferir a pasta Enviados do Zoho.');
    }
-   completed++;selected.delete(x.collection_id);
+   completed++;selected.delete(x.collection_id);reportBatchProgress(completed+' de '+previews.length+' confirmado(s) pelo Zoho.');
   }
   selected.clear();await fetchData();render();
   alert('Zoho confirmou '+completed+' cobrança(s). Confira o histórico. Nenhum título pago foi incluído na preparação.');
@@ -287,7 +289,7 @@ function renderHistory(parent){
   for(const h of ['Empresa / Documento','Vencimento','Valor','Destinatário principal','Situação','Data / horário'])tr.append(node('th',h));
   thead.append(tr);table.append(thead);
   const tbody=node('tbody');
-  for(const d of filtered){
+  for(const d of filtered.slice(0,100)){
    const r=d.collection,entry=node('tr');
    const company=node('td');company.append(node('strong',r?.company||'Boleto não localizado'),node('small','Documento: '+(r?.external_reference||'—')));
    entry.append(company,node('td',r?.due_date?String(r.due_date).split('-').reverse().join('/'):'—'),node('td',r?fmt(r.amount):'—'),node('td',d.recipient_email||'—'));
@@ -296,7 +298,7 @@ function renderHistory(parent){
    const when=node('td');when.append(node('span',historyDate(d.sent_at||d.created_at)),node('small',d.sent_at?'Envio confirmado':'Tentativa registrada'));
    entry.append(when);tbody.append(entry);
   }
-  table.append(tbody);scroll.append(table);
+  table.append(tbody);scroll.append(table);if(filtered.length>100)scroll.append(node('p','Exibindo os 100 primeiros resultados. Refine a busca para localizar os demais.','sicoob-history-info'));
  }
  search.oninput=draw;filter.onchange=draw;draw();
  section.append(node('p','Os horários seguem Brasília. O histórico registra o destinatário principal; os e-mails em CC de envios anteriores não estão armazenados. Falhas ou tentativas em processamento devem ser verificadas antes de qualquer nova ação.','sicoob-history-info'));
@@ -339,10 +341,15 @@ function render(){
  const input=node('input');input.type='file';input.accept='.csv,text/csv';
  input.onchange=()=>{const file=input.files?.[0];importCsv(file);input.value='';};
  importLabel.append(input);bar.append(importLabel);
- bar.append(button('Selecionar elegíveis',()=>{items.filter(eligible).forEach(r=>selected.add(r.id));render();}),button('Limpar seleção',()=>{selected.clear();render();}));
+ bar.append(button('Selecionar elegíveis',()=>{const eligibleItems=items.filter(eligible).slice(0,5);selected.clear();eligibleItems.forEach(r=>selected.add(r.id));render();}),button('Limpar seleção',()=>{selected.clear();render();}));
+ const companyChoose=node('select');companyChoose.setAttribute('aria-label','Selecionar cobranças por empresa');
+ companyChoose.append(new Option('Selecionar por empresa…',''));
+ for(const name of [...new Set(items.filter(eligible).map(r=>r.company))].sort((a,b)=>a.localeCompare(b,'pt-BR')))companyChoose.append(new Option(name,name));
+ companyChoose.onchange=()=>{if(!companyChoose.value)return;const batch=items.filter(r=>eligible(r)&&clean(r.company)===clean(companyChoose.value));selected.clear();batch.slice(0,5).forEach(r=>selected.add(r.id));reportBatchProgress(batch.length>5?'Selecionados 5 dos '+batch.length+' boletos desta empresa. Faça outro lote após este.':'Selecionados '+batch.length+' boleto(s) desta empresa.');render();};
+ bar.append(companyChoose);
  const send=button(`Enviar selecionados (${[...selected].filter(id=>items.some(r=>r.id===id&&eligible(r))).length})`,sendBatch);
  send.disabled=busy||![...selected].some(id=>items.some(r=>r.id===id&&eligible(r)));send.title='Máximo de 5 boletos por lote, com prévia e autorização final. Se houver falha, confira Enviados antes de repetir.';bar.append(send);
- panel.append(bar);
+ panel.append(bar);batchProgressNode=node('p',batchProgress,'hsn94-batch-status');batchProgressNode.hidden=!batchProgress;panel.append(batchProgressNode);
  panel.append(node('p','Envio em lote: até 5 boletos elegíveis por operação. Confira todas as prévias e confirme antes do Zoho. O servidor verifica novamente status, histórico e destinatários; falhas interrompem o lote sem reenvio automático.','sicoob-notice'));
  const count=node('div',undefined,'sicoob-table-heading');
  count.append(node('h2',activeTab==='pending'?'Boletos pendentes':activeTab==='sent'?'Boletos cobrados':'Boletos pagos'),node('span',`${items.filter(r=>r.status===activeTab).length} título(s) nesta aba · ${selected.size} selecionado(s)`));panel.append(count);
@@ -372,6 +379,10 @@ function render(){
   cc.setAttribute('aria-label',`E-mails em cópia de ${r.company}`);ccLabel.append(cc);
   const save=button('Salvar destinatários',async()=>{try{await saveContact(r.company,email.value,cc.value);}catch(e){alert(e.message);}});
   emailRow.append(toLabel,ccLabel);
+  if(window.HSN_EMAIL_ASSIST){
+   window.HSN_EMAIL_ASSIST.bind(email,{client:db,userId:user.id,company:()=>r.company,single:true});
+   window.HSN_EMAIL_ASSIST.bind(cc,{client:db,userId:user.id,company:()=>r.company});
+  }
   showSharedPicker(emailRow,r.company,email,cc);
   emailRow.append(save);
   const actions=node('div',undefined,'sicoob-card-actions');
