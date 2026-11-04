@@ -40,3 +40,10 @@
 @media(max-width:760px){.hsn94-billing-grid{grid-template-columns:1fr}.hsn94-queue-row{align-items:flex-start;flex-direction:column}.hsn94-email-dropdown{max-height:220px}}
 .sicoob-workspace .sicoob-actions select{min-height:35px;padding:6px 9px;border-radius:8px;border:1px solid rgba(148,163,184,.32);max-width:235px;background:var(--surface,#fff);color:inherit;font-size:.78rem}
 .hsn94-batch-status{margin:7px 0;padding:8px 10px;border-radius:9px;border:1px solid rgba(148,163,184,.2);background:rgba(148,163,184,.1);font-size:.77rem}
+
+/* Erros de módulo sempre visíveis, sem ocultar o menu ou outras telas. */
+.hsn-module-repair-error{display:grid;gap:9px;max-width:740px;padding:20px!important}
+.hsn-module-repair-error h2{font-size:1.1rem;margin:0}
+.hsn-module-repair-error p{margin:0;font-size:.85rem;overflow-wrap:anywhere}
+.hsn-module-repair-error p:nth-of-type(2){font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.76rem;opacity:.85}
+.hsn-module-repair-error button{justify-self:start;max-width:260px}
