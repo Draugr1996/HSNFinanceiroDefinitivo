@@ -111,19 +111,76 @@ function parseStatementCsv(text){const rows=parseCsv(text);if(rows.length<2)thro
  return rows.slice(headerIndex+1).map((r,i)=>{let amount=mapping.debit>=0?-Math.abs(numberBR(r[mapping.debit])):numberBR(r[mapping.amount]);const debit= mapping.debit>=0&&r[mapping.debit]!==''&&!Number.isNaN(amount);if(mapping.debit>=0&&!debit&&mapping.amount<0)amount=NaN;
  return {date:parseDate(r[mapping.date]),amount,description:r[mapping.description]||'Movimentação bancária',reference:r[mapping.reference]||'Linha '+(headerIndex+i+2),kind:debit?'DEBIT':''};});
 }
-function parseBankFile(name,text){const rows=/\.ofx$/i.test(name)?parseOfx(text):parseStatementCsv(text);const parsed=rows.filter(x=>x.date&&Number.isFinite(x.amount)&&x.amount!==0).map((x,i)=>({...x,id:'tx'+i}));if(!parsed.length)throw Error('Nenhuma movimentação bancária com data e valor válido foi encontrada.');return parsed.slice(0,2000);}
+function parseBankFile(name,text){const rows=/\.ofx$/i.test(name)?parseOfx(text):parseStatementCsv(text);const parsed=rows.filter(x=>x.date&&Number.isFinite(x.amount)&&x.amount!==0).map((x,i)=>({...x,id:'tx'+i}));if(!parsed.length)throw Error('Nenhuma movimentação bancária com data e valor válido foi encontrada.');if(parsed.length>2000)throw Error('O extrato possui mais de 2.000 movimentos. Divida por período para não deixar lançamentos fora da conferência.');return parsed;}
 function dateDiff(a,b){try{return Math.abs((root.HSN_DATES.parse(a)-root.HSN_DATES.parse(b))/86400000);}catch{return 9999;}}
+// Índices em memória: vincula o DDA importado às contas já cadastradas, sem criar baixas.
+let bankLookupCache=null;
+const bankGenericWords=new Set(['boleto','boletos','pagamento','pagamentos','titulo','titulos','cobranca','banco','bancaria','bancario','sicoob','debito','credito','transferencia','pix','conta','contas','ltda','eireli','epp','mei','comercio','comercial','servicos','servico','brasil','agencia','fatura','documento','de','da','do','dos','das','para','pelo']);
+function bankTokens(v){return [...new Set(norm(v).split(' ').filter(t=>t.length>=4&&!bankGenericWords.has(t)))];}
+function bankLookup(){
+ const snapshot=snap(),chargesList=charges();
+ if(bankLookupCache?.payables===snapshot.payables&&bankLookupCache.payableCount===snapshot.payables.length&&bankLookupCache.suppliers===snapshot.suppliers&&bankLookupCache.charges===chargesList&&bankLookupCache.ddaCount===chargesList.length)return bankLookupCache;
+ const byAmount=new Map(),supplierById=new Map(snapshot.suppliers.map(s=>[s.id,s])),ddaByAccount=new Map(),unconvertedDda=new Map();
+ for(const d of chargesList){if(d.archived)continue;
+  if(d.converted_payable_id){const list=ddaByAccount.get(d.converted_payable_id)||[];list.push(d);ddaByAccount.set(d.converted_payable_id,list);}
+  else if(cents(d.amount)>0){const key=cents(d.amount),list=unconvertedDda.get(key)||[];list.push(d);unconvertedDda.set(key,list);}
+ }
+ for(const p of snapshot.payables){if(!canPay(p))continue;const entry={p,supplier:supplierById.get(p.supplier_id),dda:ddaByAccount.get(p.id)||[]};
+  const key=cents(val(p));const list=byAmount.get(key)||[];list.push(entry);byAmount.set(key,list);
+ }
+ bankLookupCache={payables:snapshot.payables,payableCount:snapshot.payables.length,suppliers:snapshot.suppliers,charges:chargesList,ddaCount:chargesList.length,byAmount,unconvertedDda};
+ return bankLookupCache;
+}
+function bankTextMatch(tx,name,doc){
+ const description=norm(tx.description),reference=norm(tx.reference),combined=description+' '+reference;
+ const digits=String(doc||'').replace(/\D/g,'');
+ const docMatch=digits.length>=6&&digits.length<=30&&((description.replace(/ /g,'').includes(digits))||(reference.replace(/ /g,'').includes(digits)));
+ const words=bankTokens(name),found=words.filter(t=>description.split(' ').includes(t));
+ return {docMatch:!!docMatch,supplierMatch:found.length>0,matchedWords:found.length};
+}
 function candidates(tx){
  if(tx.amount>=0&&!bankPositiveAllowed)return [];
- const amount=Math.abs(tx.amount),options=[];
- for(const p of snap().payables){if(!canPay(p))continue;if(Math.abs(cents(val(p))-cents(amount))>1)continue;
- const distance=dateDiff(tx.date,p.due_date);if(distance>30)continue;
- const supp=snap().suppliers.find(s=>s.id===p.supplier_id);const tokens=norm([supp?.legal_name,supp?.trade_name,p.title].join(' ')).split(' ').filter(s=>s.length>3);
- const description=norm(tx.description);const common=tokens.filter(t=>description.includes(t));let score=40+Math.max(0,25-distance*2)+Math.min(30,common.length*12);
- if(p.bank_scheduled_date&&dateDiff(tx.date,p.bank_scheduled_date)<=2)score+=12;
- options.push({p,score,distance,nameMatch:common.length>0});
+ const index=bankLookup(),target=cents(Math.abs(tx.amount)),options=[];
+ // Apenas o mesmo valor ou diferença de um centavo para conferência manual.
+ const entries=[...(index.byAmount.get(target)||[]),...(index.byAmount.get(target-1)||[]),...(index.byAmount.get(target+1)||[])];
+ for(const {p,supplier,dda} of entries){
+  if(!canPay(p))continue;
+  const distance=dateDiff(tx.date,p.due_date),scheduled=p.bank_scheduled_date?dateDiff(tx.date,p.bank_scheduled_date):9999;
+  if(distance>30&&scheduled>2)continue;
+  const sameCent=cents(val(p))===target;
+  const party=[supplier?.legal_name,supplier?.trade_name].filter(Boolean).join(' ');
+  const primary=bankTextMatch(tx,party,p.document_number);
+  let supplierMatch=primary.supplierMatch,docMatch=primary.docMatch,relatedDda=null;
+  for(const item of dda){
+   const matched=bankTextMatch(tx,item.supplier_name,item.document_number);
+   if(matched.docMatch||matched.supplierMatch){relatedDda=item;supplierMatch=supplierMatch||matched.supplierMatch;docMatch=docMatch||matched.docMatch;}
+  }
+  const titleMatch=bankTokens(p.title).some(t=>norm(tx.description).split(' ').includes(t));
+  const matchQuality=docMatch?42:supplierMatch?32:titleMatch?12:0;
+  let score=30+Math.max(0,22-distance*2)+matchQuality+(scheduled<=2?10:0);
+  if(!sameCent)score=Math.min(score,52);
+  // Um título sem identificador bancário nunca vira correspondência forte só pelo valor/data.
+  const nameMatch=tx.amount<0&&sameCent&&(docMatch||supplierMatch);
+  options.push({p,score,distance,nameMatch,documentMatch:docMatch,ddaMatch:!!relatedDda,exactValue:sameCent});
  }
- return options.sort((a,b)=>b.score-a.score||a.distance-b.distance||a.p.due_date.localeCompare(b.p.due_date));
+ return options.sort((a,b)=>b.score-a.score||Number(b.documentMatch)-Number(a.documentMatch)||a.distance-b.distance||a.p.due_date.localeCompare(b.p.due_date));
+}
+function unconvertedDdaMatch(tx){
+ const list=bankLookup().unconvertedDda.get(cents(Math.abs(tx.amount)))||[];
+ return list.filter(d=>dateDiff(tx.date,d.due_date)<=30&&(()=>{
+  const matched=bankTextMatch(tx,d.supplier_name,d.document_number);
+  return matched.docMatch||matched.supplierMatch;
+ })());
+}
+function duplicateBankMovements(items){
+ const counts=new Map();
+ for(const tx of items){
+  const ref=String(tx.reference||'').trim();const identity=ref&&!/^linha \d+$/i.test(ref)?'ref:'+ref+'|'+tx.date+'|'+cents(tx.amount):'finger:'+tx.date+'|'+cents(tx.amount)+'|'+norm(tx.description);
+  counts.set(identity,(counts.get(identity)||0)+1);
+ }
+ const duplicate=new Set();
+ for(const tx of items){const ref=String(tx.reference||'').trim();const identity=ref&&!/^linha \d+$/i.test(ref)?'ref:'+ref+'|'+tx.date+'|'+cents(tx.amount):'finger:'+tx.date+'|'+cents(tx.amount)+'|'+norm(tx.description);if(counts.get(identity)>1)duplicate.add(tx.id);}
+ return duplicate;
 }
 async function readStatement(file){
  if(!file)return;if(file.size>5*1024*1024){bankError='O arquivo deve ter até 5 MB.';reconciliation();return;}
@@ -140,14 +197,15 @@ function reconciliation(){
  const main=document.getElementById('records');const hint=area(main,'hsn90-note');hint.append(el('strong','Conciliação assistida: não movimenta dinheiro.'),el('p','Pagamentos já baixados, contas canceladas ou sem assinatura confirmada não recebem sugestões para baixa. O arquivo fica somente na memória desta aba. Extratos bancários variam de formato; revise valores, datas e beneficiários.'));
  if(bankError)main.append(el('p',bankError,'hsn90-error'));if(!bankRows.length){empty(main,'Selecione um arquivo OFX ou CSV do Sicoob para começar. Nenhum registro será criado no banco.');return;}
  main.append(el('h3',bankFileInfo));if(bankFileWarning)main.append(el('p',bankFileWarning,'hsn90-hint'));
- const relevant=bankRows.filter(tx=>tx.amount<0||bankPositiveAllowed);
- const stat=area(main,'hsn90-reconcile-summary');const definite=relevant.filter(tx=>{const c=candidates(tx);return c.length&&c[0].score>=65&&c[0].nameMatch&&(c.length===1||c[0].score-c[1].score>=20);});stat.append(el('strong',relevant.length+' movimento(s) elegível(is) · '+definite.length+' correspondência(s) fortes'),el('span','Sugestões não são confirmação de pagamento.'));
+ const relevant=bankRows.filter(tx=>tx.amount<0||bankPositiveAllowed),duplicateIds=duplicateBankMovements(relevant);
+ const stat=area(main,'hsn90-reconcile-summary');const definite=relevant.filter(tx=>{const c=candidates(tx);return !duplicateIds.has(tx.id)&&c.length&&c[0].score>=65&&c[0].nameMatch&&(c.length===1||c[0].score-c[1].score>=20);});stat.append(el('strong',relevant.length+' movimento(s) elegível(is) · '+definite.length+' correspondência(s) fortes'),el('span','Sugestões não são confirmação de pagamento.'));
  const toolbar=area(main,'hsn90-toolbar');const controlsRow=area(toolbar,'hsn90-toolbar-actions');
  controlsRow.append(btn('Conferir baixas selecionadas (mesma data)',()=>{
   const txs=relevant.filter(tx=>bankChecked.has(tx.id));if(!txs.length){window.alert('Marque os movimentos que deseja conferir.');return;}
+  if(txs.some(tx=>duplicateIds.has(tx.id))){window.alert('O extrato contém lançamentos repetidos. Confira e exporte um extrato sem duplicidades antes de baixar.');return;}
   const differentDates=new Set(txs.map(tx=>tx.date));if(differentDates.size!==1){window.alert('Escolha movimentos do mesmo dia para a baixa em lote. Repita para outra data.');return;}
   const choices=txs.map(tx=>({tx,p:snap().payables.find(p=>p.id===bankSelection.get(tx.id))}));
-  if(choices.some(x=>!x.p||!canPay(x.p))){window.alert('Há movimentos sem conta válida ou ainda aguardando assinatura. Revise a seleção.');return;}
+  if(choices.some(x=>!x.p||!canPay(x.p)||cents(val(x.p))!==cents(Math.abs(x.tx.amount))||!candidates(x.tx).some(c=>c.p.id===x.p.id))){window.alert('Há contas inválidas ou valores incompatíveis. Revise o extrato e o DDA antes de baixar.');return;}
   const ids=new Set(choices.map(x=>x.p.id));if(ids.size!==choices.length){window.alert('Uma conta foi selecionada para mais de um movimento. Revise para evitar baixa duplicada.');return;}
   const total=choices.reduce((sum,x)=>sum+Math.abs(x.tx.amount),0);
   if(!confirm('Abrir conferência de '+choices.length+' pagamentos de '+dateBR(txs[0].date)+' no valor de '+money(total)+'? A baixa ainda exigirá confirmação dos dados.'))return;
@@ -155,29 +213,58 @@ function reconciliation(){
  },'primary'));
  controlsRow.append(btn('Limpar seleção',()=>{bankChecked.clear();reconciliation();}));
  const wrap=area(main,'hsn90-table-wrap');const table=el('table',undefined,'hsn90-table');const h=el('thead'),hr=el('tr');for(const title of ['Marcar','Data','Histórico bancário','Saída','Conta sugerida','Ação'])hr.append(el('th',title));h.append(hr);table.append(h);const body=el('tbody');
- relevant.slice(0,300).forEach(tx=>{const list=candidates(tx),c=list[0],strong=c&&c.score>=65&&c.nameMatch&&(list.length===1||c.score-list[1].score>=20);const row=el('tr');const selectCell=el('td'),mark=el('input');mark.type='checkbox';mark.className='hsn86-checkbox';mark.checked=bankChecked.has(tx.id);mark.setAttribute('aria-label','Selecionar transação de '+dateBR(tx.date)+' '+tx.description);mark.onchange=()=>{mark.checked?bankChecked.add(tx.id):bankChecked.delete(tx.id);};selectCell.append(mark);row.append(selectCell);
+ relevant.slice(0,300).forEach(tx=>{const list=candidates(tx),c=list[0],strong=!duplicateIds.has(tx.id)&&c&&c.score>=65&&c.nameMatch&&(list.length===1||c.score-list[1].score>=20);const row=el('tr');const selectCell=el('td'),mark=el('input');mark.type='checkbox';mark.className='hsn86-checkbox';mark.checked=bankChecked.has(tx.id);mark.setAttribute('aria-label','Selecionar transação de '+dateBR(tx.date)+' '+tx.description);mark.onchange=()=>{mark.checked?bankChecked.add(tx.id):bankChecked.delete(tx.id);};selectCell.append(mark);row.append(selectCell);
  row.append(el('td',dateBR(tx.date)),el('td',tx.description),el('td',money(Math.abs(tx.amount)),'hsn90-money'));
  const choose=el('td'),sel=select([['','Não vincular / revisar'],...list.slice(0,12).map(a=>[a.p.id,a.p.title+' · '+dateBR(a.p.due_date)+' · '+money(val(a.p))])],bankSelection.get(tx.id)||(strong?c.p.id:''));if(strong&&!bankSelection.has(tx.id))bankSelection.set(tx.id,c.p.id);
  sel.setAttribute('aria-label','Selecionar conta para o movimento '+tx.description);sel.onchange=()=>{if(sel.value)bankSelection.set(tx.id,sel.value);else bankSelection.delete(tx.id);};choose.append(sel);
- choose.append(el('small',list.length?strong?'Sugestão forte; confirme fornecedor, valor e data.':'Correspondência não conclusiva: revise manualmente.':'Nenhuma conta aberta com valor e data próximos.','hsn90-micro'));row.append(choose);
- const actions=el('td');const act=btn('Conferir baixa',()=>{const id=sel.value;const payable=snap().payables.find(p=>p.id===id);if(!payable){window.alert('Escolha uma conta válida antes de conferir.');return;}if(!canPay(payable)){window.alert('A conta ainda não está apta à baixa. Confirme a assinatura no banco e atualize a etapa primeiro.');return;}if(!confirm('Conferir a baixa da conta '+payable.title+' com base neste lançamento de '+dateBR(tx.date)+'? Você ainda revisará data, valor e confirmação no formulário.'))return;root.HSN_FINANCE.bulkPaid([payable],{date:tx.date,reference:tx.reference});},'primary');act.disabled=!list.length;actions.append(act);row.append(actions);body.append(row);
+ const pendingDda=unconvertedDdaMatch(tx);
+ choose.append(el('small',duplicateIds.has(tx.id)?'ALERTA: possível lançamento duplicado no extrato. Não efetue a baixa.':list.length?strong?(c.ddaMatch?'Sugestão vinculada ao DDA. Confirme documento e comprovante.':'Sugestão forte; confirme fornecedor, valor e data.'):'Correspondência não conclusiva: revise manualmente.':pendingDda.length?'DDA importado encontrado, mas ainda sem conta vinculada. Confira e converta no DDA antes da baixa.':'Nenhuma conta aberta com valor e data próximos.','hsn90-micro'));row.append(choose);
+ const actions=el('td');const act=btn('Conferir baixa',()=>{const id=sel.value;const payable=snap().payables.find(p=>p.id===id);if(!payable){window.alert('Escolha uma conta válida antes de conferir.');return;}if(!canPay(payable)){window.alert('A conta ainda não está apta à baixa. Confirme a assinatura no banco e atualize a etapa primeiro.');return;}if(duplicateIds.has(tx.id)){window.alert('Lançamento repetido no extrato. Confira a origem antes da baixa.');return;}if(cents(val(payable))!==cents(Math.abs(tx.amount))){window.alert('Valor da conta diferente do extrato. Baixa bloqueada até a conferência.');return;}if(!candidates(tx).some(c=>c.p.id===payable.id)){window.alert('A conta não é uma correspondência válida deste movimento.');return;}if(!confirm('Conferir a baixa da conta '+payable.title+' com base neste lançamento de '+dateBR(tx.date)+'? Você ainda revisará data, valor e confirmação no formulário.'))return;root.HSN_FINANCE.bulkPaid([payable],{date:tx.date,reference:tx.reference});},'primary');act.disabled=!list.length;actions.append(act);row.append(actions);body.append(row);
  });table.append(body);wrap.append(table);
  if(relevant.length>300)main.append(el('p','Exibindo os primeiros 300 movimentos. Use extratos menores para conferir o restante.','hsn90-hint'));
 }
+// Busca indexada de títulos já cadastrados: evita percorrer todas as contas para cada boleto DDA.
+let ddaLookupCache=null;
+function ddaLookup(bankPayables){
+ const snapshot=snap();
+ if(ddaLookupCache?.records===bankPayables&&ddaLookupCache.suppliers===snapshot.suppliers)return ddaLookupCache;
+ const byAmount=new Map(),byDoc=new Map(),byBarcode=new Map(),supplierById=new Map(snapshot.suppliers.map(s=>[s.id,s]));
+ const add=(index,key,p)=>{if(!key)return;const list=index.get(key)||[];list.push(p);index.set(key,list);};
+ for(const p of bankPayables){if(p.archived)continue;
+  add(byAmount,cents(val(p)),p);
+  const doc=norm(p.document_number).replace(/\s/g,''),bar=String(p.barcode||'').replace(/\D/g,'');
+  if(doc.length>=6)add(byDoc,doc,p);if(bar.length>=30)add(byBarcode,bar,p);
+ }
+ const result={records:bankPayables,suppliers:snapshot.suppliers,byAmount,byDoc,byBarcode,supplierById};
+ if(bankPayables===snapshot.payables)ddaLookupCache=result;
+ return result;
+}
 function ddaSuggestions(c,bankPayables=snap().payables){
  if(c.converted_payable_id)return [];
- const doc=norm(c.document_number).replace(/\s/g,''),bar=String(c.barcode||'').replace(/\D/g,''),amt=cents(c.amount);
- const tax=String(c.tax_id||'').replace(/\D/g,'');const supplierIds=new Set(snap().suppliers.filter(s=>tax&&String(s.tax_id||'').replace(/\D/g,'')===tax).map(s=>s.id));
- const items=[];for(const p of bankPayables){if(p.archived)continue;const pDoc=norm(p.document_number).replace(/\s/g,'');const pBar=String(p.barcode||'').replace(/\D/g,'');const sameDoc=doc.length>=4&&pDoc===doc;const sameBar=bar.length>=30&&bar===pBar;
- const sameSupplier=supplierIds.has(p.supplier_id);const sameDate=p.due_date===c.due_date;const sameAmount=amt===cents(val(p));
- const similar=(sameDoc||sameBar)?'Correspondência de documento/código':sameSupplier&&sameDate&&sameAmount?'Mesmo fornecedor, valor e vencimento':null;
- if(similar)items.push({p,reason:similar,strong:sameDoc||sameBar});
- }return items.sort((a,b)=>Number(b.strong)-Number(a.strong)).slice(0,3);
+ const index=ddaLookup(bankPayables),doc=norm(c.document_number).replace(/\s/g,''),bar=String(c.barcode||'').replace(/\D/g,''),amt=cents(c.amount),tax=String(c.tax_id||'').replace(/\D/g,'');
+ const possible=new Map();
+ for(const p of index.byAmount.get(amt)||[])possible.set(p.id,p);
+ if(doc.length>=6)for(const p of index.byDoc.get(doc)||[])possible.set(p.id,p);
+ if(bar.length>=30)for(const p of index.byBarcode.get(bar)||[])possible.set(p.id,p);
+ const hits=[];
+ for(const p of possible.values()){
+  const sameDoc=doc.length>=6&&norm(p.document_number).replace(/\s/g,'')===doc;
+  const sameBar=bar.length>=30&&String(p.barcode||'').replace(/\D/g,'')===bar;
+  const supp=index.supplierById.get(p.supplier_id);
+  const pTax=String(supp?.tax_id||'').replace(/\D/g,'');
+  const sameSupplier=(!!tax&&tax===pTax)||!!(norm(c.supplier_name)&&(norm(c.supplier_name)===norm(supp?.legal_name)||norm(c.supplier_name)===norm(supp?.trade_name)));
+  const sameDate=p.due_date===c.due_date,sameAmount=amt===cents(val(p));
+  if(!(sameDoc||sameBar||(sameSupplier&&sameDate&&sameAmount)))continue;
+  const reason=sameBar?'Mesmo código de barras':sameDoc?'Mesmo número de documento':'Mesmo fornecedor, valor e vencimento';
+  const discrepancy=(sameDoc||sameBar)&&(!sameDate||!sameAmount)?' (atenção: data/valor divergente)':'';
+  hits.push({p,reason:reason+discrepancy,strong:sameDoc||sameBar});
+ }
+ return hits.sort((a,b)=>Number(b.strong)-Number(a.strong)).slice(0,3);
 }
 function appendDdaReview(card,c){const matches=ddaSuggestions(c);if(!matches.length)return;
  const region=el('div',undefined,'hsn90-dda-existing');region.append(el('strong','Possível conta já cadastrada'),el('p','Confira antes de converter: '+matches[0].reason+'. A correspondência não cria vínculo automaticamente.'));
  for(const entry of matches){region.append(btn('Abrir '+entry.p.title+' · '+money(val(entry.p)),()=>openAccount(entry.p)));}card.append(region);
 }
-function reset(){bankRows=[];bankSelection.clear();bankChecked.clear();bankFileInfo='';bankError='';approvalSelected.clear();agendaSelected.clear();}
+function reset(){bankRows=[];bankSelection.clear();bankChecked.clear();bankLookupCache=null;bankFileInfo='';bankError='';approvalSelected.clear();agendaSelected.clear();}
 root.HSN90={handles:v=>['approvals','reconciliation','payments_agenda'].includes(v),render:v=>v==='approvals'?approval():v==='reconciliation'?reconciliation():agenda(),ddaSuggestions,appendDdaReview,parseCsv,parseOfx,parseStatementCsv,parseBankFile,candidates,reset};
 })(window);
