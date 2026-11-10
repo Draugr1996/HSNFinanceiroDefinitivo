@@ -120,15 +120,19 @@ function bankTokens(v){return [...new Set(norm(v).split(' ').filter(t=>t.length>
 function bankLookup(){
  const snapshot=snap(),chargesList=charges();
  if(bankLookupCache?.payables===snapshot.payables&&bankLookupCache.payableCount===snapshot.payables.length&&bankLookupCache.suppliers===snapshot.suppliers&&bankLookupCache.charges===chargesList&&bankLookupCache.ddaCount===chargesList.length)return bankLookupCache;
- const byAmount=new Map(),supplierById=new Map(snapshot.suppliers.map(s=>[s.id,s])),ddaByAccount=new Map(),unconvertedDda=new Map();
+ const byAmount=new Map(),blockedByAmount=new Map(),paidByAmount=new Map(),supplierById=new Map(snapshot.suppliers.map(s=>[s.id,s])),ddaByAccount=new Map(),unconvertedDda=new Map();
+ const add=(index,key,item)=>{if(!Number.isFinite(key)||key<=0)return;const list=index.get(key)||[];list.push(item);index.set(key,list);};
  for(const d of chargesList){if(d.archived)continue;
   if(d.converted_payable_id){const list=ddaByAccount.get(d.converted_payable_id)||[];list.push(d);ddaByAccount.set(d.converted_payable_id,list);}
-  else if(cents(d.amount)>0){const key=cents(d.amount),list=unconvertedDda.get(key)||[];list.push(d);unconvertedDda.set(key,list);}
+  else add(unconvertedDda,cents(d.amount),d);
  }
- for(const p of snapshot.payables){if(!canPay(p))continue;const entry={p,supplier:supplierById.get(p.supplier_id),dda:ddaByAccount.get(p.id)||[]};
-  const key=cents(val(p));const list=byAmount.get(key)||[];list.push(entry);byAmount.set(key,list);
+ for(const p of snapshot.payables){if(p.archived||p.workflow_status==='cancelled')continue;
+  const entry={p,supplier:supplierById.get(p.supplier_id),dda:ddaByAccount.get(p.id)||[]},amount=cents(val(p));
+  if(p.payment_status==='paid')add(paidByAmount,amount,entry);
+  else if(canPay(p))add(byAmount,amount,entry);
+  else add(blockedByAmount,amount,entry);
  }
- bankLookupCache={payables:snapshot.payables,payableCount:snapshot.payables.length,suppliers:snapshot.suppliers,charges:chargesList,ddaCount:chargesList.length,byAmount,unconvertedDda};
+ bankLookupCache={payables:snapshot.payables,payableCount:snapshot.payables.length,suppliers:snapshot.suppliers,charges:chargesList,ddaCount:chargesList.length,byAmount,blockedByAmount,paidByAmount,unconvertedDda};
  return bankLookupCache;
 }
 function bankTextMatch(tx,name,doc){
@@ -141,13 +145,14 @@ function bankTextMatch(tx,name,doc){
 function candidates(tx){
  if(tx.amount>=0&&!bankPositiveAllowed)return [];
  const index=bankLookup(),target=cents(Math.abs(tx.amount)),options=[];
- // Apenas o mesmo valor ou diferença de um centavo para conferência manual.
+ // Os históricos de pagamentos do Sicoob frequentemente omitem fornecedor e documento.
+ // Sem eliminar títulos por um limite fixo de 30 dias, exibir coincidências de valor
+ // classificadas para revisão. Diferença de um centavo nunca pode ser baixada.
  const entries=[...(index.byAmount.get(target)||[]),...(index.byAmount.get(target-1)||[]),...(index.byAmount.get(target+1)||[])];
  for(const {p,supplier,dda} of entries){
   if(!canPay(p))continue;
   const distance=dateDiff(tx.date,p.due_date),scheduled=p.bank_scheduled_date?dateDiff(tx.date,p.bank_scheduled_date):9999;
-  if(distance>30&&scheduled>2)continue;
-  const sameCent=cents(val(p))===target;
+  const dateDistance=Math.min(distance,scheduled),sameCent=cents(val(p))===target;
   const party=[supplier?.legal_name,supplier?.trade_name].filter(Boolean).join(' ');
   const primary=bankTextMatch(tx,party,p.document_number);
   let supplierMatch=primary.supplierMatch,docMatch=primary.docMatch,relatedDda=null;
@@ -156,21 +161,35 @@ function candidates(tx){
    if(matched.docMatch||matched.supplierMatch){relatedDda=item;supplierMatch=supplierMatch||matched.supplierMatch;docMatch=docMatch||matched.docMatch;}
   }
   const titleMatch=bankTokens(p.title).some(t=>norm(tx.description).split(' ').includes(t));
-  const matchQuality=docMatch?42:supplierMatch?32:titleMatch?12:0;
-  let score=30+Math.max(0,22-distance*2)+matchQuality+(scheduled<=2?10:0);
+  const textScore=docMatch?42:supplierMatch?32:titleMatch?12:0;
+  let score=30+Math.max(0,22-dateDistance*2)+textScore+(scheduled<=2?10:0);
   if(!sameCent)score=Math.min(score,52);
-  // Um título sem identificador bancário nunca vira correspondência forte só pelo valor/data.
+  if(dateDistance>30)score=Math.min(score,64);
   const nameMatch=tx.amount<0&&sameCent&&(docMatch||supplierMatch);
-  options.push({p,score,distance,nameMatch,documentMatch:docMatch,ddaMatch:!!relatedDda,exactValue:sameCent});
+  // A identidade do fornecedor ou documento E uma data próxima são indispensáveis
+  // para sugestão forte. Igualdade de valor, sozinha, exige escolha manual.
+  const confident=nameMatch&&dateDistance<=30&&score>=65;
+  options.push({p,score,distance:dateDistance,nameMatch,confident,documentMatch:docMatch,ddaMatch:!!relatedDda,ddaLinked:dda.length>0,exactValue:sameCent});
  }
- return options.sort((a,b)=>b.score-a.score||Number(b.documentMatch)-Number(a.documentMatch)||a.distance-b.distance||a.p.due_date.localeCompare(b.p.due_date));
+ return options.sort((a,b)=>Number(b.confident)-Number(a.confident)||Number(b.exactValue)-Number(a.exactValue)||b.score-a.score||a.distance-b.distance||a.p.due_date.localeCompare(b.p.due_date));
 }
 function unconvertedDdaMatch(tx){
  const list=bankLookup().unconvertedDda.get(cents(Math.abs(tx.amount)))||[];
- return list.filter(d=>dateDiff(tx.date,d.due_date)<=30&&(()=>{
+ return list.map(d=>{
   const matched=bankTextMatch(tx,d.supplier_name,d.document_number);
-  return matched.docMatch||matched.supplierMatch;
- })());
+  const distance=dateDiff(tx.date,d.due_date);
+  return {d,distance,identified:matched.docMatch||matched.supplierMatch};
+ }).filter(x=>x.identified||x.distance<=180)
+  .sort((a,b)=>Number(b.identified)-Number(a.identified)||a.distance-b.distance)
+  .slice(0,8).map(x=>({...x.d,_bankDistance:x.distance,_bankIdentified:x.identified}));
+}
+function relatedAccountStatus(tx){
+ const index=bankLookup(),value=cents(Math.abs(tx.amount));
+ const sort=list=>(list||[]).map(x=>x.p).sort((a,b)=>dateDiff(tx.date,a.due_date)-dateDiff(tx.date,b.due_date));
+ return {blocked:sort(index.blockedByAmount.get(value)),paid:sort(index.paidByAmount.get(value))};
+}
+function uniqueStrongChoice(list){
+ return !!(list.length&&list[0].confident&&(list.length===1||list[0].score-list[1].score>=20));
 }
 function duplicateBankMovements(items){
  const counts=new Map();
@@ -182,13 +201,23 @@ function duplicateBankMovements(items){
  for(const tx of items){const ref=String(tx.reference||'').trim();const identity=ref&&!/^linha \d+$/i.test(ref)?'ref:'+ref+'|'+tx.date+'|'+cents(tx.amount):'finger:'+tx.date+'|'+cents(tx.amount)+'|'+norm(tx.description);if(counts.get(identity)>1)duplicate.add(tx.id);}
  return duplicate;
 }
+async function decodeBankText(file){
+ const buffer=await file.arrayBuffer(),bytes=new Uint8Array(buffer);
+ const probe=new TextDecoder('latin1').decode(bytes.slice(0,700));
+ const declaredLegacy=/(?:CHARSET\s*:\s*(?:1252|8859-1|ANSI)|ENCODING\s*:\s*(?:USASCII|ASCII)|encoding\s*=\s*["'](?:ISO-8859-1|windows-1252)["'])/i.test(probe);
+ if(declaredLegacy)return new TextDecoder('windows-1252').decode(bytes);
+ try{return new TextDecoder('utf-8',{fatal:true}).decode(bytes);}
+ catch{return new TextDecoder('windows-1252').decode(bytes);}
+}
 async function readStatement(file){
  if(!file)return;if(file.size>5*1024*1024){bankError='O arquivo deve ter até 5 MB.';reconciliation();return;}
  if(!/\.(ofx|csv)$/i.test(file.name)){bankError='Selecione um extrato .OFX ou .CSV.';reconciliation();return;}
- try{let text=await file.text();if(text.includes('\uFFFD')&&/\.csv$/i.test(file.name)){try{const buffer=await file.arrayBuffer();text=new TextDecoder('windows-1252').decode(buffer);}catch{}}
+ try{
+  const text=await decodeBankText(file);
   bankRows=parseBankFile(file.name,text);bankSelection.clear();bankChecked.clear();bankFileInfo=file.name+' · '+bankRows.length+' movimento(s) reconhecido(s)';bankError='';
   bankFileWarning=bankRows.filter(x=>x.amount>=0).length+' crédito(s)/valor(es) positivos foram excluídos das sugestões por padrão.';
- }catch(e){bankError=e.message||'Falha ao ler o arquivo.';bankRows=[];bankSelection.clear();bankChecked.clear();}reconciliation();
+ }catch(e){bankError=e.message||'Falha ao ler o arquivo.';bankRows=[];bankSelection.clear();bankChecked.clear();}
+ reconciliation();
 }
 function reconciliation(){
  setupPage('Conciliação bancária','Importe um extrato OFX ou CSV. O sistema sugere vínculos; a baixa só ocorre após conferência e confirmação.','reconciliation');
@@ -198,14 +227,24 @@ function reconciliation(){
  if(bankError)main.append(el('p',bankError,'hsn90-error'));if(!bankRows.length){empty(main,'Selecione um arquivo OFX ou CSV do Sicoob para começar. Nenhum registro será criado no banco.');return;}
  main.append(el('h3',bankFileInfo));if(bankFileWarning)main.append(el('p',bankFileWarning,'hsn90-hint'));
  const relevant=bankRows.filter(tx=>tx.amount<0||bankPositiveAllowed),duplicateIds=duplicateBankMovements(relevant);
- const stat=area(main,'hsn90-reconcile-summary');const definite=relevant.filter(tx=>{const c=candidates(tx);return !duplicateIds.has(tx.id)&&c.length&&c[0].score>=65&&c[0].nameMatch&&(c.length===1||c[0].score-c[1].score>=20);});stat.append(el('strong',relevant.length+' movimento(s) elegível(is) · '+definite.length+' correspondência(s) fortes'),el('span','Sugestões não são confirmação de pagamento.'));
+ // Cache de sugestões por extrato evita uma segunda pesquisa de cada movimento.
+ const prepared=relevant.map(tx=>({tx,list:candidates(tx),dda:unconvertedDdaMatch(tx),status:relatedAccountStatus(tx)}));
+ const strongEntries=prepared.filter(({tx,list})=>!duplicateIds.has(tx.id)&&uniqueStrongChoice(list));
+ const strongCounts=new Map();for(const row of strongEntries){const id=row.list[0].p.id;strongCounts.set(id,(strongCounts.get(id)||0)+1);}
+ const definite=strongEntries.filter(({list})=>strongCounts.get(list[0].p.id)===1);
+ const definiteIds=new Set(definite.map(({tx})=>tx.id));
+ const matched=prepared.filter(x=>x.list.length),pendingDda=prepared.filter(x=>x.dda.length);
+ const stat=area(main,'hsn90-reconcile-summary');stat.append(el('strong',relevant.length+' movimento(s) elegível(is) · '+definite.length+' sugestão(ões) fortes'),el('span',matched.length+' com possível conta · '+pendingDda.length+' com DDA ainda não convertido · as demais exigem revisão.'));
  const toolbar=area(main,'hsn90-toolbar');const controlsRow=area(toolbar,'hsn90-toolbar-actions');
  controlsRow.append(btn('Conferir baixas selecionadas (mesma data)',()=>{
   const txs=relevant.filter(tx=>bankChecked.has(tx.id));if(!txs.length){window.alert('Marque os movimentos que deseja conferir.');return;}
-  if(txs.some(tx=>duplicateIds.has(tx.id))){window.alert('O extrato contém lançamentos repetidos. Confira e exporte um extrato sem duplicidades antes de baixar.');return;}
+  if(txs.some(tx=>duplicateIds.has(tx.id))){window.alert('O extrato contém lançamentos repetidos. Confira a origem antes de baixar.');return;}
   const differentDates=new Set(txs.map(tx=>tx.date));if(differentDates.size!==1){window.alert('Escolha movimentos do mesmo dia para a baixa em lote. Repita para outra data.');return;}
   const choices=txs.map(tx=>({tx,p:snap().payables.find(p=>p.id===bankSelection.get(tx.id))}));
   if(choices.some(x=>!x.p||!canPay(x.p)||cents(val(x.p))!==cents(Math.abs(x.tx.amount))||!candidates(x.tx).some(c=>c.p.id===x.p.id))){window.alert('Há contas inválidas ou valores incompatíveis. Revise o extrato e o DDA antes de baixar.');return;}
+  if(choices.some(x=>!definiteIds.has(x.tx.id)||prepared.find(r=>r.tx.id===x.tx.id)?.list[0]?.p.id!==x.p.id)){
+   window.alert('Conferência em lote permitida somente para correspondências fortes e sem conflitos. Movimentos sugeridos apenas por valor/data devem ser conferidos individualmente.');return;
+  }
   const ids=new Set(choices.map(x=>x.p.id));if(ids.size!==choices.length){window.alert('Uma conta foi selecionada para mais de um movimento. Revise para evitar baixa duplicada.');return;}
   const total=choices.reduce((sum,x)=>sum+Math.abs(x.tx.amount),0);
   if(!confirm('Abrir conferência de '+choices.length+' pagamentos de '+dateBR(txs[0].date)+' no valor de '+money(total)+'? A baixa ainda exigirá confirmação dos dados.'))return;
@@ -213,15 +252,47 @@ function reconciliation(){
  },'primary'));
  controlsRow.append(btn('Limpar seleção',()=>{bankChecked.clear();reconciliation();}));
  const wrap=area(main,'hsn90-table-wrap');const table=el('table',undefined,'hsn90-table');const h=el('thead'),hr=el('tr');for(const title of ['Marcar','Data','Histórico bancário','Saída','Conta sugerida','Ação'])hr.append(el('th',title));h.append(hr);table.append(h);const body=el('tbody');
- relevant.slice(0,300).forEach(tx=>{const list=candidates(tx),c=list[0],strong=!duplicateIds.has(tx.id)&&c&&c.score>=65&&c.nameMatch&&(list.length===1||c.score-list[1].score>=20);const row=el('tr');const selectCell=el('td'),mark=el('input');mark.type='checkbox';mark.className='hsn86-checkbox';mark.checked=bankChecked.has(tx.id);mark.setAttribute('aria-label','Selecionar transação de '+dateBR(tx.date)+' '+tx.description);mark.onchange=()=>{mark.checked?bankChecked.add(tx.id):bankChecked.delete(tx.id);};selectCell.append(mark);row.append(selectCell);
- row.append(el('td',dateBR(tx.date)),el('td',tx.description),el('td',money(Math.abs(tx.amount)),'hsn90-money'));
- const choose=el('td'),sel=select([['','Não vincular / revisar'],...list.slice(0,12).map(a=>[a.p.id,a.p.title+' · '+dateBR(a.p.due_date)+' · '+money(val(a.p))])],bankSelection.get(tx.id)||(strong?c.p.id:''));if(strong&&!bankSelection.has(tx.id))bankSelection.set(tx.id,c.p.id);
- sel.setAttribute('aria-label','Selecionar conta para o movimento '+tx.description);sel.onchange=()=>{if(sel.value)bankSelection.set(tx.id,sel.value);else bankSelection.delete(tx.id);};choose.append(sel);
- const pendingDda=unconvertedDdaMatch(tx);
- choose.append(el('small',duplicateIds.has(tx.id)?'ALERTA: possível lançamento duplicado no extrato. Não efetue a baixa.':list.length?strong?(c.ddaMatch?'Sugestão vinculada ao DDA. Confirme documento e comprovante.':'Sugestão forte; confirme fornecedor, valor e data.'):'Correspondência não conclusiva: revise manualmente.':pendingDda.length?'DDA importado encontrado, mas ainda sem conta vinculada. Confira e converta no DDA antes da baixa.':'Nenhuma conta aberta com valor e data próximos.','hsn90-micro'));row.append(choose);
- const actions=el('td');const act=btn('Conferir baixa',()=>{const id=sel.value;const payable=snap().payables.find(p=>p.id===id);if(!payable){window.alert('Escolha uma conta válida antes de conferir.');return;}if(!canPay(payable)){window.alert('A conta ainda não está apta à baixa. Confirme a assinatura no banco e atualize a etapa primeiro.');return;}if(duplicateIds.has(tx.id)){window.alert('Lançamento repetido no extrato. Confira a origem antes da baixa.');return;}if(cents(val(payable))!==cents(Math.abs(tx.amount))){window.alert('Valor da conta diferente do extrato. Baixa bloqueada até a conferência.');return;}if(!candidates(tx).some(c=>c.p.id===payable.id)){window.alert('A conta não é uma correspondência válida deste movimento.');return;}if(!confirm('Conferir a baixa da conta '+payable.title+' com base neste lançamento de '+dateBR(tx.date)+'? Você ainda revisará data, valor e confirmação no formulário.'))return;root.HSN_FINANCE.bulkPaid([payable],{date:tx.date,reference:tx.reference});},'primary');act.disabled=!list.length;actions.append(act);row.append(actions);body.append(row);
+ prepared.slice(0,300).forEach(({tx,list,dda,status})=>{
+  const c=list[0],strong=definiteIds.has(tx.id),row=el('tr'),selectCell=el('td'),mark=el('input');
+  mark.type='checkbox';mark.className='hsn86-checkbox';mark.checked=bankChecked.has(tx.id);mark.setAttribute('aria-label','Selecionar transação de '+dateBR(tx.date)+' '+tx.description);mark.onchange=()=>{mark.checked?bankChecked.add(tx.id):bankChecked.delete(tx.id);};selectCell.append(mark);row.append(selectCell);
+  row.append(el('td',dateBR(tx.date)),el('td',tx.description),el('td',money(Math.abs(tx.amount)),'hsn90-money'));
+  const choose=el('td');
+  if(bankSelection.has(tx.id)&&!list.some(x=>x.p.id===bankSelection.get(tx.id)))bankSelection.delete(tx.id);
+  if(strong&&!bankSelection.has(tx.id))bankSelection.set(tx.id,c.p.id);
+  const sel=select([['','Não vincular / revisar'],...list.slice(0,12).map(a=>[a.p.id,a.p.title+' · '+dateBR(a.p.due_date)+' · '+money(val(a.p))+(a.distance>30?' · data distante':'')])],bankSelection.get(tx.id)||'');
+  sel.setAttribute('aria-label','Selecionar conta para o movimento '+tx.description);sel.onchange=()=>{if(sel.value)bankSelection.set(tx.id,sel.value);else bankSelection.delete(tx.id);};choose.append(sel);
+  const text=duplicateIds.has(tx.id)?'ALERTA: possível lançamento duplicado no extrato. Não efetue a baixa.':
+   list.length?(strong?(c.ddaLinked?'Sugestão forte; conta originada do DDA. Confira o documento.':'Sugestão forte; confira fornecedor, valor e data.'):
+    'Possível conta pelo valor'+(list[0].distance>30?' (vencimento distante)':' e data')+'. Confirme manualmente: o histórico bancário não identifica o beneficiário.'):
+   dda.length?'Possível DDA pelo mesmo valor, ainda não convertido em conta. Confira antes de baixar.':
+   status.blocked.length?'Existe conta com o mesmo valor, mas não liberada para baixa (assinatura/aprovação pendente).':
+   status.paid.length?'Existe conta já marcada como paga com o mesmo valor. Confira para não duplicar a baixa.':
+   'Nenhuma conta nem DDA compatível pelo valor foi encontrada. Confira se a despesa foi cadastrada.';
+  choose.append(el('small',text,'hsn90-micro'));
+  if(dda.length){const best=dda[0],line=el('small','DDA: '+best.supplier_name+' · vence '+dateBR(best.due_date)+' · '+money(best.amount)+(dda.length>1?' (+'+(dda.length-1)+' outro(s))':''),'hsn90-micro');
+   const action=btn('Abrir DDA',()=>root.HSN_FINANCE.navigate('dda'));action.classList.add('hsn90-dda-open');choose.append(line,action);
+  }
+  if(status.blocked.length&&!list.length&&!dda.length)choose.append(el('small','Conta pendente: '+status.blocked[0].title+' · '+dateBR(status.blocked[0].due_date),'hsn90-micro'));
+  if(status.paid.length&&!list.length&&!dda.length)choose.append(el('small','Conta paga: '+status.paid[0].title+' · '+dateBR(status.paid[0].due_date),'hsn90-micro'));
+  row.append(choose);
+  const actions=el('td');const act=btn('Conferir baixa',()=>{
+   const id=sel.value,payable=snap().payables.find(p=>p.id===id);
+   if(!payable){window.alert('Escolha uma conta válida antes de conferir.');return;}
+   if(!canPay(payable)){window.alert('A conta ainda não está apta à baixa. Confirme a assinatura no banco e atualize a etapa primeiro.');return;}
+   if(duplicateIds.has(tx.id)){window.alert('Lançamento repetido no extrato. Confira a origem antes da baixa.');return;}
+   if(cents(val(payable))!==cents(Math.abs(tx.amount))){window.alert('Valor da conta diferente do extrato. Baixa bloqueada até a conferência.');return;}
+   const choice=candidates(tx).find(c=>c.p.id===payable.id);
+   if(!choice){window.alert('A conta não é uma correspondência válida deste movimento.');return;}
+   if([...bankSelection.values()].filter(x=>x===id).length>1){window.alert('Esta conta foi relacionada a mais de um movimento do extrato. Revise para evitar baixa duplicada.');return;}
+   const weak=!strong||c?.p.id!==payable.id;
+   const confirmMessage=(weak?'ATENÇÃO: correspondência não confirmada pelo histórico bancário. Mesmo valor não comprova o mesmo pagamento. Confira fornecedor, documento e comprovante no banco.\n\n':'')+
+    'Abrir conferência da conta '+payable.title+' para o movimento de '+dateBR(tx.date)+' de '+money(Math.abs(tx.amount))+'? A baixa ainda exigirá confirmação no formulário.';
+   if(!confirm(confirmMessage))return;
+   root.HSN_FINANCE.bulkPaid([payable],{date:tx.date,reference:tx.reference});
+  },'primary');act.disabled=!list.length;actions.append(act);row.append(actions);body.append(row);
  });table.append(body);wrap.append(table);
  if(relevant.length>300)main.append(el('p','Exibindo os primeiros 300 movimentos. Use extratos menores para conferir o restante.','hsn90-hint'));
+
 }
 // Busca indexada de títulos já cadastrados: evita percorrer todas as contas para cada boleto DDA.
 let ddaLookupCache=null;

@@ -78,3 +78,7 @@
 #records .hsn95-dda-quick{grid-column:1/-1;display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:8px 12px}
 .hsn95-dda-quick button{font-size:12px;min-height:36px}
 .hsn95-dda-quick small{color:var(--muted);font-size:11px}
+
+/* DDA encontrado sem conta a pagar: atalho de conferência, sem dar baixa. */
+.hsn90-table .hsn90-dda-open{display:inline-flex;margin:5px 0 1px;padding:5px 9px;font-size:11px;min-height:25px;border-radius:7px;}
+.hsn90-table .hsn90-micro{display:block;line-height:1.35;margin-top:3px;}
