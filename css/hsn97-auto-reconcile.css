@@ -1,0 +1,26 @@
+/* HSN 9.7 — painel compacto de conciliação inteligente; respeita temas claro/escuro. */
+#records .hsn97-auto-panel{grid-column:1/-1;display:flex;flex-direction:column;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:15px;padding:17px 18px;margin-bottom:12px;min-width:0}
+#records .hsn97-panel-top{display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap}
+#records .hsn97-panel-top>div{flex:1 1 280px;min-width:0}
+#records .hsn97-eyebrow{font-size:10px;color:var(--accent);letter-spacing:.09em;font-weight:850}
+#records .hsn97-panel-top h3{font-size:17px;font-weight:830;letter-spacing:-.025em;color:var(--ink);margin:3px 0 5px}
+#records .hsn97-panel-top p{color:var(--muted);font-size:12px;line-height:1.55;margin:0;max-width:78ch}
+#records .hsn97-panel-top button{font-size:12px;white-space:normal;padding:10px 14px;border-radius:9px;flex:0 1 220px;min-height:40px;font-weight:780}
+#records .hsn97-panel-top button:disabled{opacity:.55;cursor:not-allowed}
+#records .hsn97-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+#records .hsn97-metric{border:1px solid var(--line);border-radius:11px;padding:12px 13px;background:var(--surface2);display:flex;flex-direction:column;gap:5px;min-height:75px}
+#records .hsn97-metric strong{font-size:26px;font-weight:830;letter-spacing:-.04em;line-height:1.05;color:var(--ink)}
+#records .hsn97-metric span{font-size:11px;font-weight:680;color:var(--muted)}
+#records .hsn97-ok strong{color:var(--green)}
+#records .hsn97-warn strong,#records .hsn97-scheduled strong{color:var(--amber)}
+#records .hsn97-eligible{padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface2)}
+#records .hsn97-eligible summary{font-size:12px;font-weight:740;cursor:pointer;color:var(--ink)}
+#records .hsn97-eligible p{margin:6px 0;font-size:11px;color:var(--muted)}
+#records .hsn97-warning{font-size:11px;margin:0;color:var(--muted)}
+#records .hsn97-bank-status{display:block;font-size:11px;font-weight:730;margin:5px 0 0;color:var(--amber);line-height:1.45}
+#records .hsn97-bank-status.hsn97-success{color:var(--green)}
+@media(max-width:800px){#records .hsn97-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}#records .hsn97-auto-panel{padding:14px}#records .hsn97-panel-top button{flex:1 1 100%}}
+
+#records .hsn97-history{grid-column:1/-1;margin:0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface2);min-width:0}
+#records .hsn97-history[hidden]{display:none!important}
+#records .hsn97-history h4{margin:0 0 9px;font-size:13px;color:var(--ink)}

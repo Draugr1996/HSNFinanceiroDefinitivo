@@ -1,0 +1,51 @@
+/* HSN 9.6 | Central DDA: novo painel sem alterar visual da conciliação OFX/CSV. */
+#finance-controls.hsn96-dda-controls{display:flex!important;align-items:end!important;gap:10px!important;flex-wrap:wrap!important;padding:14px!important;background:var(--surface)!important;border:1px solid var(--line)!important;border-radius:16px!important;margin-bottom:16px!important}
+#finance-controls.hsn96-dda-controls>label{font-size:11px!important;font-weight:740!important;color:var(--muted)!important;min-width:140px;max-width:235px;margin:0!important;flex:1 1 142px}
+#finance-controls.hsn96-dda-controls select,#finance-controls.hsn96-dda-controls input{min-height:37px!important;border-radius:9px!important;font-size:12px!important;padding:7px 10px!important;background:var(--surface2)!important;color:var(--ink)!important;border:1px solid var(--line)!important;margin-top:5px!important}
+#finance-controls.hsn96-dda-controls button{min-height:37px!important;border-radius:9px!important;font-size:12px!important;font-weight:720!important;padding:8px 12px!important;white-space:normal}
+#records .hsn96-dda-overview{display:flex;flex-direction:column;gap:14px;padding:0!important;min-width:0;grid-column:1/-1}
+#records .hsn96-dda-hero{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:18px;padding:21px 24px;border-radius:17px;background:linear-gradient(120deg,#10233e,#173b5d 75%,#255275);color:#f5f9ff;border:1px solid rgba(141,180,209,.26)}
+#records .hsn96-dda-hero::before{content:'';position:absolute;right:-65px;bottom:-130px;width:250px;height:250px;border-radius:50%;background:rgba(239,140,60,.08);pointer-events:none}
+#records .hsn96-dda-eyebrow{display:block;margin-bottom:4px;color:#f4a569;font-size:10px;font-weight:850;letter-spacing:.1em}
+#records .hsn96-dda-hero h2{font-size:clamp(21px,2.2vw,29px);letter-spacing:-.04em;margin:0 0 5px;color:#fff}
+#records .hsn96-dda-hero p{color:#cad8e8!important;margin:0!important;font-size:12px;max-width:67ch;line-height:1.55}
+#records .hsn96-dda-brand{position:relative;z-index:1;display:inline-block;padding:8px 11px;border-radius:100px;border:1px solid rgba(245,249,255,.2);background:rgba(255,255,255,.07);font-size:10px;letter-spacing:.04em;font-weight:750;white-space:nowrap;color:#e3edf9}
+#records .hsn96-dda-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;min-width:0}
+#records .hsn96-dda-metric{display:flex;flex-direction:column;align-items:flex-start;text-align:left!important;gap:5px;min-height:107px;border-radius:14px;padding:14px 16px!important;border:1px solid var(--line)!important;background:var(--surface)!important;color:var(--ink)!important;min-width:0;box-shadow:none!important;transition:border-color .15s,transform .15s}
+#records .hsn96-dda-metric:hover{transform:translateY(-1px);border-color:var(--accent)!important}
+#records .hsn96-dda-metric.is-active{border-color:var(--accent)!important;box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 16%,transparent)!important}
+#records .hsn96-dda-metric span{color:var(--muted);font-size:11px;font-weight:720}
+#records .hsn96-dda-metric strong{font-size:clamp(23px,2vw,30px);line-height:1.05;font-variant-numeric:tabular-nums;letter-spacing:-.04em;color:var(--ink)}
+#records .hsn96-dda-metric small{color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums;line-height:1.4}
+#records .hsn96-dda-disclaimer{margin:0!important;font-size:11px;color:var(--muted);line-height:1.5;max-width:115ch}
+#records .hsn96-dda-list-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:5px 0 0;color:var(--ink)}
+#records .hsn96-dda-list-heading strong{font-size:14px;font-weight:780}
+#records .hsn96-dda-list-heading span{font-size:11px;color:var(--muted)}
+#records .hsn96-dda-columns{display:grid;grid-template-columns:24px minmax(180px,2.25fr) minmax(100px,.76fr) minmax(104px,.9fr) minmax(160px,1.35fr) minmax(160px,1.3fr) minmax(150px,1.4fr);align-items:center;gap:10px;padding:0 13px!important;margin:3px 0 -7px}
+#records .hsn96-dda-columns span{font-size:10px;font-weight:840;text-transform:uppercase;letter-spacing:.055em;color:var(--muted)}
+#records .hsn96-dda-row{grid-column:1/-1;min-width:0;display:grid;grid-template-columns:24px minmax(180px,2.25fr) minmax(100px,.76fr) minmax(104px,.9fr) minmax(160px,1.35fr) minmax(160px,1.3fr) minmax(150px,1.4fr);align-items:center;gap:10px;padding:13px!important;margin:0!important;border-radius:12px;background:var(--surface);border:1px solid var(--line);color:var(--ink);transition:border-color .13s,background .13s}
+#records .hsn96-dda-row:hover{border-color:color-mix(in srgb,var(--accent) 48%,var(--line))}
+#records .hsn96-dda-row.dda-selected{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 5%,var(--surface))}
+#records .hsn96-dda-check{margin:0!important;display:flex;align-items:center;justify-content:center}
+#records .hsn96-dda-check input{width:17px!important;min-width:17px!important;height:17px!important;min-height:17px!important;margin:0!important;accent-color:var(--accent);box-shadow:none!important}
+#records .hsn96-dda-identity,#records .hsn96-dda-dates,#records .hsn96-dda-value,#records .hsn96-dda-financial,#records .hsn96-dda-review{min-width:0;display:flex;flex-direction:column;gap:5px}
+#records .hsn96-dda-identity strong{font-size:12px;font-weight:800;line-height:1.4;overflow-wrap:anywhere;color:var(--ink)}
+#records .hsn96-dda-identity small,#records .hsn96-dda-dates small,#records .hsn96-dda-value small,#records .hsn96-dda-financial small,#records .hsn96-dda-review small{color:var(--muted);font-size:10px;line-height:1.45;overflow-wrap:anywhere}
+#records .hsn96-dda-dates strong,#records .hsn96-dda-value strong{font-size:12px;font-weight:780;color:var(--ink);font-variant-numeric:tabular-nums}
+#records .hsn96-dda-value strong{white-space:nowrap}
+#records .hsn96-dda-chip{display:inline-flex;align-self:flex-start;white-space:normal;line-height:1.35;font-size:10px;padding:6px 9px;font-weight:800;border-radius:8px;border:1px solid transparent}
+#records .hsn96-dda-open{background:var(--surface2);color:var(--ink);border-color:var(--line)}
+#records .hsn96-dda-scheduled{background:var(--amber-soft);color:var(--amber)}
+#records .hsn96-dda-paid{background:var(--green-soft);color:var(--green)}
+#records .hsn96-dda-chip.hsn96-dda-review{background:var(--amber-soft);color:var(--amber)}
+#records .hsn96-review-label{font-size:11px;color:var(--ink);font-weight:700}
+#records .hsn96-alert,#records .hsn96-dda-conflict{color:var(--amber)!important;font-weight:720}
+#records .hsn96-dda-row-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:5px;min-width:0}
+#records .hsn96-dda-row-actions button{min-height:29px!important;font-size:10px!important;font-weight:720!important;padding:5px 9px!important;border-radius:7px!important;white-space:normal;max-width:100%}
+#records .hsn96-dda-details{grid-column:2/-1;color:var(--muted);padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface2)}
+#records .hsn96-dda-details summary{font-size:11px;color:var(--amber);font-weight:750;cursor:pointer}
+#records .hsn96-dda-details p{margin:5px 0;font-size:11px;color:var(--muted)}
+#records .hsn96-dda-empty{background:var(--surface);border:1px dashed var(--line);border-radius:13px;padding:24px;text-align:center;color:var(--muted)}
+.hsn96-import-status{font-size:12px!important;color:var(--amber)!important;font-weight:680;background:var(--amber-soft);padding:8px;border-radius:8px}
+@media(max-width:1120px){#records .hsn96-dda-columns{display:none}#records .hsn96-dda-row{grid-template-columns:22px minmax(175px,2fr) minmax(95px,.8fr) minmax(110px,.85fr) minmax(180px,1.5fr)}#records .hsn96-dda-review{grid-column:2/4}#records .hsn96-dda-row-actions{grid-column:4/6;justify-content:flex-end}#records .hsn96-dda-details{grid-column:2/-1}}
+@media(max-width:750px){#records .hsn96-dda-hero{padding:17px;flex-direction:column;align-items:flex-start;gap:10px}#records .hsn96-dda-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}#records .hsn96-dda-metric{padding:12px!important;min-height:96px}#records .hsn96-dda-row{grid-template-columns:22px minmax(0,1fr) minmax(105px,.5fr);gap:11px}#records .hsn96-dda-identity{grid-column:2/4}#records .hsn96-dda-dates{grid-column:2}#records .hsn96-dda-value{grid-column:3;align-items:flex-end}#records .hsn96-dda-financial{grid-column:2/4}#records .hsn96-dda-review{grid-column:2/4}#records .hsn96-dda-row-actions{grid-column:2/4;justify-content:flex-start}#records .hsn96-dda-details{grid-column:2/4}#finance-controls.hsn96-dda-controls>label{flex:1 1 135px}#records .hsn96-dda-list-heading{align-items:flex-start;flex-direction:column}#records .hsn96-dda-hero h2{font-size:23px}}

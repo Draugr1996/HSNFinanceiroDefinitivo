@@ -102,14 +102,14 @@ function numberBR(s){let raw=String(s??'').replace(/[\sR$]/g,'').replace(/[−�
 function parseDate(s){const val=String(s||'').trim();let y,m,d;if(/^\d{8}/.test(val)){y=+val.slice(0,4);m=+val.slice(4,6);d=+val.slice(6,8);}else if(/^\d{4}-\d{2}-\d{2}/.test(val)){y=+val.slice(0,4);m=+val.slice(5,7);d=+val.slice(8,10);}else{const a=val.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})/);if(!a)return '';d=+a[1];m=+a[2];y=+a[3];if(y<100)y+=2000;}
  const iso=[y,String(m).padStart(2,'0'),String(d).padStart(2,'0')].join('-');try{root.HSN_DATES.parse(iso);return iso;}catch{return '';}}
 function ofxTag(txt,name){const regex=new RegExp('<'+name+'>([^<\\r\\n]*)','i');return(txt.match(regex)?.[1]||'').trim();}
-function parseOfx(text){const matches=[...text.matchAll(/<STMTTRN>([\s\S]*?)(?:<\/STMTTRN>|(?=<STMTTRN>)|$)/gi)];return matches.map((m,i)=>({date:parseDate(ofxTag(m[1],'DTPOSTED')),amount:numberBR(ofxTag(m[1],'TRNAMT')),description:ofxTag(m[1],'MEMO')||ofxTag(m[1],'NAME')||'Movimentação bancária',reference:ofxTag(m[1],'FITID')||String(i+1),kind:ofxTag(m[1],'TRNTYPE')}));}
+function parseOfx(text){const matches=[...text.matchAll(/<STMTTRN>([\s\S]*?)(?:<\/STMTTRN>|(?=<STMTTRN>)|$)/gi)];const account=ofxTag(text,'ACCTID');return matches.map((m,i)=>{const fitid=ofxTag(m[1],'FITID');return {date:parseDate(ofxTag(m[1],'DTPOSTED')),amount:numberBR(ofxTag(m[1],'TRNAMT')),description:[ofxTag(m[1],'MEMO'),ofxTag(m[1],'NAME'),ofxTag(m[1],'CHECKNUM')].filter((x,i,a)=>x&&a.indexOf(x)===i).join(' · ')||'Movimentação bancária',reference:fitid||String(i+1),bankReference:fitid,stableReference:!!fitid&&fitid.length>=6,bankAccount:account,sourceType:'ofx',settledProof:true,proofType:'posted_ofx',kind:ofxTag(m[1],'TRNTYPE')};});}
 function parseStatementCsv(text){const rows=parseCsv(text);if(rows.length<2)throw Error('O CSV não contém linhas suficientes.');
- const signatures={date:['data','data lancamento','data movimento','dt lancamento','date'],amount:['valor','valor r','amount','valor lancamento'],debit:['debito','valor debito','saida','saidas','valor saida'],credit:['credito','valor credito','entrada','entradas'],description:['historico','descricao','detalhes','descricao lancamento','estabelecimento','favorecido','nome','memo'],reference:['documento','numero documento','identificador','id transacao','autenticacao','referencia']};
+ const signatures={date:['data','data lancamento','data movimento','dt lancamento','date'],amount:['valor','valor r','amount','valor lancamento'],debit:['debito','valor debito','saida','saidas','valor saida'],credit:['credito','valor credito','entrada','entradas'],description:['historico','descricao','detalhes','descricao lancamento','estabelecimento','favorecido','nome','memo'],reference:['documento','numero documento','identificador','id transacao','autenticacao','referencia','codigo transacao'],extra:['complemento','descricao adicional','historico complementar','info complementar'],tax:['cnpj','cpf cnpj','cnpj cpf','cnpj beneficiario','documento beneficiario'],balance:['saldo','saldo r','saldo apos lancamento','saldo disponivel','saldo atual'],situation:['situacao','status','situacao lancamento','estado lancamento','status pagamento']};
  let headerIndex=-1,mapping=null;
  for(let i=0;i<Math.min(rows.length,16);i++){const cols=rows[i].map(norm),map={};for(const [kind,words]of Object.entries(signatures))map[kind]=cols.findIndex(c=>words.includes(c));if(map.date>=0&&(map.amount>=0||map.debit>=0)){headerIndex=i;mapping=map;break;}}
  if(headerIndex<0)throw Error('Não identifiquei colunas de data e valor/débito. Confira o layout do extrato antes de tentar novamente.');
  return rows.slice(headerIndex+1).map((r,i)=>{let amount=mapping.debit>=0?-Math.abs(numberBR(r[mapping.debit])):numberBR(r[mapping.amount]);const debit= mapping.debit>=0&&r[mapping.debit]!==''&&!Number.isNaN(amount);if(mapping.debit>=0&&!debit&&mapping.amount<0)amount=NaN;
- return {date:parseDate(r[mapping.date]),amount,description:r[mapping.description]||'Movimentação bancária',reference:r[mapping.reference]||'Linha '+(headerIndex+i+2),kind:debit?'DEBIT':''};});
+ const bankRef=mapping.reference>=0?String(r[mapping.reference]||'').trim():'';const situation=mapping.situation>=0?norm(r[mapping.situation]):'';const cleared=/^(efetivado|efetivada|pago|paga|liquidado|liquidada|compensado|compensada|executado|executada|concluido|concluida)$/.test(situation);const scheduled=/(agendad|programad|pendente|autorizad|processando)/.test(situation);const validBalance=mapping.balance>=0&&Number.isFinite(numberBR(r[mapping.balance]));const refHeader=mapping.reference>=0?norm(rows[headerIndex][mapping.reference]):'';const transactionalRef=['id transacao','identificador','autenticacao','codigo transacao'].includes(refHeader);const verifiedStatus=cleared&&transactionalRef;const settledProof=!scheduled&&(validBalance||verifiedStatus);return {date:parseDate(r[mapping.date]),amount,description:[r[mapping.description],r[mapping.extra],r[mapping.tax]].filter(Boolean).join(' · ')||'Movimentação bancária',reference:bankRef||'Linha '+(headerIndex+i+2),bankReference:bankRef,stableReference:bankRef.length>=6,sourceType:'csv',bankAccount:'',settledProof,proofType:verifiedStatus?'confirmed_csv_status':validBalance?'posted_csv_balance':'',kind:debit?'DEBIT':''};});
 }
 function parseBankFile(name,text){const rows=/\.ofx$/i.test(name)?parseOfx(text):parseStatementCsv(text);const parsed=rows.filter(x=>x.date&&Number.isFinite(x.amount)&&x.amount!==0).map((x,i)=>({...x,id:'tx'+i}));if(!parsed.length)throw Error('Nenhuma movimentação bancária com data e valor válido foi encontrada.');if(parsed.length>2000)throw Error('O extrato possui mais de 2.000 movimentos. Divida por período para não deixar lançamentos fora da conferência.');return parsed;}
 function dateDiff(a,b){try{return Math.abs((root.HSN_DATES.parse(a)-root.HSN_DATES.parse(b))/86400000);}catch{return 9999;}}
@@ -123,7 +123,7 @@ function bankLookup(){
  const byAmount=new Map(),blockedByAmount=new Map(),paidByAmount=new Map(),supplierById=new Map(snapshot.suppliers.map(s=>[s.id,s])),ddaByAccount=new Map(),unconvertedDda=new Map();
  const add=(index,key,item)=>{if(!Number.isFinite(key)||key<=0)return;const list=index.get(key)||[];list.push(item);index.set(key,list);};
  for(const d of chargesList){if(d.archived)continue;
-  if(d.converted_payable_id){const list=ddaByAccount.get(d.converted_payable_id)||[];list.push(d);ddaByAccount.set(d.converted_payable_id,list);}
+  if(d.converted_payable_id||d.linked_payable_id){const accountId=d.converted_payable_id||d.linked_payable_id;const list=ddaByAccount.get(accountId)||[];list.push(d);ddaByAccount.set(accountId,list);}
   else add(unconvertedDda,cents(d.amount),d);
  }
  for(const p of snapshot.payables){if(p.archived||p.workflow_status==='cancelled')continue;
@@ -219,6 +219,51 @@ async function readStatement(file){
  }catch(e){bankError=e.message||'Falha ao ler o arquivo.';bankRows=[];bankSelection.clear();bankChecked.clear();}
  reconciliation();
 }
+async function hashTransaction(identity){
+ if(!globalThis.crypto?.subtle)throw Error('Conexão segura HTTPS obrigatória para identificar transações.');
+ const bytes=new TextEncoder().encode(identity),digest=await crypto.subtle.digest('SHA-256',bytes);
+ return [...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+async function reconcileAutomatically(eligible){
+ if(!eligible.length){window.alert('Nenhum débito possui prova documental suficiente para baixa automática. Revise os lançamentos pendentes.');return;}
+ const chosen=eligible.slice(0,100),total=chosen.reduce((sum,r)=>sum+Number(r.payable.actual_amount),0);
+ const f=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
+ if(!window.confirm('CONCILIAÇÃO AUTOMÁTICA · EXTRATO + DDA\n\n'+chosen.length+' baixa(s) identificada(s) · '+f.format(total)+'\n'+
+  'O HSN registrará somente débitos com documento/CPF-CNPJ ou código de barras no EXTRATO, conta vinculada e valor exato.\n\n'+
+  'Isso NÃO executa pagamento no banco. Confirma o registro destes pagamentos já efetivados?'))return;
+ await operation(async()=>{
+  const refreshed=root.HSN97.reconcile(bankRows,charges(),snap().payables,snap().suppliers,{today:today()});
+  const approved=new Set(chosen.map(x=>x.tx.id+'|'+x.payable.id+'|'+x.dda.id));
+  const current=refreshed.filter(x=>x.status==='auto'&&approved.has(x.tx.id+'|'+x.payable.id+'|'+x.dda.id));
+  if(current.length!==chosen.length)throw Error('As sugestões mudaram. Importe o extrato novamente e confira antes de dar baixa.');
+  const records=[];
+  for(const r of current){records.push({payable_id:r.payable.id,dda_id:r.dda.id,amount:Number(r.payable.actual_amount),date:r.tx.date,
+   reference:r.tx.bankReference,history:r.tx.description,source_type:r.tx.sourceType,proof_type:r.tx.proofType,file:bankFileInfo.split(' · ')[0],transaction_key:await hashTransaction(r.transactionIdentity)});}
+  const reply=await db.rpc('hsn_apply_reconciled_bank_payments',{p_items:records});
+  if(reply.error){if(reply.error.code==='PGRST202'||/hsn_apply_reconciled_bank_payments.*does not exist/i.test(reply.error.message||'')){
+    throw Error('Antes da baixa automática, execute sql/HSN-9-7-conciliacao-automatica.sql no Supabase. Nenhuma baixa foi gravada.');}
+   throw reply.error;}
+  if(Number(reply.data?.applied)!==records.length)throw Error('O servidor retornou uma quantidade diferente. Verifique o histórico bancário antes de repetir.');
+  bankChecked.clear();bankSelection.clear();bankLookupCache=null;
+  await root.HSN_FINANCE.load('reconciliation');
+  notice(reply.data.applied+' pagamento(s) registrado(s) automaticamente mediante confirmação, com DDA, extrato e histórico auditável.');
+ });
+}
+async function showAutoReconciliationHistory(){
+ await operation(async()=>{
+  const host=document.getElementById('hsn97-history');if(!host)return;
+  const response=await db.from('hsn_bank_reconciliation_log').select('transaction_date,amount,bank_reference,bank_history,source_file,dda_charge_id,payable_id,created_at').order('created_at',{ascending:false}).limit(100);
+  if(response.error){if(response.error.code==='42P01'||response.error.code==='PGRST205')throw Error('Instale sql/HSN-9-7-conciliacao-automatica.sql no Supabase para consultar o histórico.');throw response.error;}
+  host.replaceChildren();host.hidden=false;
+  host.append(el('h4','Últimas '+response.data.length+' baixa(s) automáticas registradas'));
+  if(!response.data.length){host.append(el('p','Ainda não há baixas automáticas registradas.'));return;}
+  const table=el('table',undefined,'hsn90-table');const thead=el('thead'),header=el('tr');
+  for(const name of ['Data','Valor','Referência bancária','Conta','Origem'])header.append(el('th',name));thead.append(header);table.append(thead);
+  const tbody=el('tbody');for(const r of response.data){const tr=el('tr');const linked=snap().payables.find(p=>p.id===r.payable_id);
+   for(const value of [dateBR(r.transaction_date),money(r.amount),r.bank_reference,linked?.title||r.payable_id.slice(0,8),r.source_file||'Extrato'])tr.append(el('td',value));tbody.append(tr);}
+  table.append(tbody);const wrap=area(host,'hsn90-table-wrap');wrap.append(table);
+ });
+}
 function reconciliation(){
  setupPage('Conciliação bancária','Importe um extrato OFX ou CSV. O sistema sugere vínculos; a baixa só ocorre após conferência e confirmação.','reconciliation');
  const controls=document.getElementById('finance-controls');const input=el('input');input.type='file';input.accept='.ofx,.csv,text/csv,application/x-ofx';input.setAttribute('aria-label','Extrato bancário OFX ou CSV');input.onchange=()=>readStatement(input.files[0]);controls.append(label('Selecionar extrato do banco',input));
@@ -229,6 +274,22 @@ function reconciliation(){
  const relevant=bankRows.filter(tx=>tx.amount<0||bankPositiveAllowed),duplicateIds=duplicateBankMovements(relevant);
  // Cache de sugestões por extrato evita uma segunda pesquisa de cada movimento.
  const prepared=relevant.map(tx=>({tx,list:candidates(tx),dda:unconvertedDdaMatch(tx),status:relatedAccountStatus(tx)}));
+ const automatic=root.HSN97.reconcile(relevant,charges(),snap().payables,snap().suppliers,{today:today()});
+ const autoEligible=automatic.filter(x=>x.status==='auto'),toReview=automatic.filter(x=>['review','blocked','duplicate','no_account','no_dda'].includes(x.status));
+ const paidCount=automatic.filter(x=>x.status==='paid').length,scheduledCount=automatic.filter(x=>x.status==='scheduled').length;
+ const autoPanel=area(main,'hsn97-auto-panel');
+ const panelTop=el('div',undefined,'hsn97-panel-top');
+ const panelInfo=el('div');panelInfo.append(el('span','CONCILIAÇÃO DDA + EXTRATO · HSN 9.7','hsn97-eyebrow'),el('h3','Baixa automática com evidência bancária'),
+   el('p','Reconhece contas e títulos do DDA. Apenas débitos liquidados e identificados por documento/CPF-CNPJ ou código de barras entram na baixa automática; o restante precisa de conferência.'));
+ panelTop.append(panelInfo);
+ const automaticButton=btn('Registrar '+Math.min(autoEligible.length,100)+' baixa(s) segura(s)',()=>reconcileAutomatically(autoEligible),'primary');
+ automaticButton.disabled=!autoEligible.length;panelTop.append(automaticButton);panelTop.append(btn('Histórico de baixas',showAutoReconciliationHistory,'secondary'));autoPanel.append(panelTop);const history=area(autoPanel,'hsn97-history');history.id='hsn97-history';history.hidden=true;
+ const metricRow=area(autoPanel,'hsn97-metrics');
+ for(const [value,name,cls]of [[autoEligible.length,'Prontas para baixa','hsn97-ok'],[toReview.length,'Precisam revisão','hsn97-warn'],[paidCount,'Já pagas no HSN','hsn97-ok'],[scheduledCount,'Agendadas no HSN','hsn97-scheduled']]){
+  const box=el('div',undefined,'hsn97-metric '+cls);box.append(el('strong',value),el('span',name));metricRow.append(box);
+ }
+ if(autoEligible.length){const details=el('details',undefined,'hsn97-eligible');details.append(el('summary','Ver '+autoEligible.length+' pagamento(s) com evidência forte'));for(const r of autoEligible.slice(0,35))details.append(el('p',r.dda.supplier_name+' · '+money(r.payable.actual_amount)+' · '+dateBR(r.tx.date)+' · '+r.evidence));if(autoEligible.length>35)details.append(el('p','Exibidos 35 registros; a operação está limitada a lotes de 100.'));autoPanel.append(details);}
+ else autoPanel.append(el('p','Nenhuma baixa 100% identificada neste extrato. Históricos genéricos do Sicoob exigem revisão, mesmo quando valor e data coincidirem.','hsn97-warning'));
  const strongEntries=prepared.filter(({tx,list})=>!duplicateIds.has(tx.id)&&uniqueStrongChoice(list));
  const strongCounts=new Map();for(const row of strongEntries){const id=row.list[0].p.id;strongCounts.set(id,(strongCounts.get(id)||0)+1);}
  const definite=strongEntries.filter(({list})=>strongCounts.get(list[0].p.id)===1);
@@ -269,6 +330,12 @@ function reconciliation(){
    status.paid.length?'Existe conta já marcada como paga com o mesmo valor. Confira para não duplicar a baixa.':
    'Nenhuma conta nem DDA compatível pelo valor foi encontrada. Confira se a despesa foi cadastrada.';
   choose.append(el('small',text,'hsn90-micro'));
+  const evaluation=automatic.find(x=>x.tx.id===tx.id);
+  if(evaluation?.status==='auto')choose.append(el('small','BAIXA AUTOMÁTICA ELEGÍVEL: '+evaluation.evidence,'hsn97-bank-status hsn97-success'));
+  else if(evaluation?.status==='scheduled')choose.append(el('small','AGENDADA: não baixada. '+evaluation.reason,'hsn97-bank-status'));
+  else if(evaluation?.status==='paid')choose.append(el('small','JÁ PAGA no HSN: sem nova baixa.','hsn97-bank-status hsn97-success'));
+  else if(evaluation?.status==='review')choose.append(el('small','REVISÃO: '+evaluation.reason,'hsn97-bank-status'));
+
   if(dda.length){const best=dda[0],line=el('small','DDA: '+best.supplier_name+' · vence '+dateBR(best.due_date)+' · '+money(best.amount)+(dda.length>1?' (+'+(dda.length-1)+' outro(s))':''),'hsn90-micro');
    const action=btn('Abrir DDA',()=>root.HSN_FINANCE.navigate('dda'));action.classList.add('hsn90-dda-open');choose.append(line,action);
   }
@@ -311,7 +378,7 @@ function ddaLookup(bankPayables){
  return result;
 }
 function ddaSuggestions(c,bankPayables=snap().payables){
- if(c.converted_payable_id)return [];
+ if(c.converted_payable_id||c.linked_payable_id)return [];
  const index=ddaLookup(bankPayables),doc=norm(c.document_number).replace(/\s/g,''),bar=String(c.barcode||'').replace(/\D/g,''),amt=cents(c.amount),tax=String(c.tax_id||'').replace(/\D/g,'');
  const possible=new Map();
  for(const p of index.byAmount.get(amt)||[])possible.set(p.id,p);
