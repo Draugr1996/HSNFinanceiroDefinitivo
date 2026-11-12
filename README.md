@@ -1,57 +1,16 @@
-# Financeiro HSN 9.9 — Cobrança manual e reenvio controlado
+# Cobranças Sicoob — reenvio manual
 
-Esta atualização preserva a central DDA e a conciliação da versão 9.7/9.8 e libera a cobrança manual no módulo Sicoob.
-
-## O que mudou
-
-- Você pode iniciar uma cobrança antes ou depois do vencimento.
-- Um boleto já cobrado pode receber novo aviso quando você solicitar novamente.
-- O botão passa a mostrar **Reenviar cobrança** para títulos marcados como cobrados.
-- O sistema identifica o último envio confirmado no histórico novo ou no histórico legado e registra cada novo envio como uma operação separada.
-- Cada envio continua exigindo prévia e duas confirmações na tela.
-- O servidor valida os dados do título, destinatários, histórico e autorização assinada antes de chamar o Zoho.
-- Títulos marcados como pagos ou cancelados continuam bloqueados.
-- Tentativas em processamento ou com resultado incerto continuam bloqueadas até conferência manual no Zoho.
-- Após o Zoho confirmar o envio, o título fica com status `sent` e `sent_at` atualizado.
-
-## Arquivos alterados
-
-- `index.html`
-- `js/sicoob-collections.js`
-- `service-worker.js`
-- `supabase/functions/zoho-send-mail/index.ts`
+Permite enviar e reenviar cobranças pendentes ou já cobradas, antes ou depois do vencimento. Cada operação exige prévia e confirmação. Títulos pagos/cancelados e tentativas incertas permanecem bloqueados. O histórico combina os envios antigos com os novos registros de hsn_send_jobs.
 
 ## Instalação
+1. No Supabase, execute sql/HSN-sicoob-reenvio.sql no SQL Editor.
+2. Substitua o código da Edge Function zoho-send-mail pelo arquivo supabase/functions/zoho-send-mail/index.ts e publique a função.
+3. Atualize os arquivos do site e recarregue com Ctrl+F5.
+4. Em Cobranças Sicoob → Cobrados, clique em Reenviar cobrança. Confira os dados e confirme.
 
-1. Faça backup do repositório e do Supabase.
-2. Atualize o site no GitHub Pages com os arquivos do projeto.
-3. No Supabase, abra **Edge Functions → zoho-send-mail**.
-4. Substitua o código da função pelo conteúdo de `supabase/functions/zoho-send-mail/index.ts` e faça o deploy.
-5. Não é necessária uma nova variável de ambiente nem migração SQL para estas alterações. A função usa as mesmas tabelas, variáveis e credenciais já presentes no código recebido.
-6. Atualize o site com recarga forçada (Ctrl+F5) ou feche e abra novamente o navegador.
+A função usa as tabelas e rotinas já referenciadas pelo código fornecido: hsn_send_jobs, hsn_send_claim e hsn_send_finish, além dos cadastros Sicoob e credenciais Zoho existentes. A migração adiciona uma reserva serializada para cobranças e não modifica as rotinas de faturamento. Caso a infraestrutura hsn_send_jobs/hsn_send_claim/hsn_send_finish ainda não esteja instalada, será necessário fornecer sua migração original; esta entrega não recria essas estruturas sem conhecer o esquema atual.
 
-## Como usar
+## Verificação
+Testes locais de regras de cobrança, assinatura de aprovação e histórico; verificação de sintaxe JavaScript e TypeScript. A implantação, a compatibilidade das rotinas SQL existentes e o envio real precisam ser verificados no Supabase do hotel. Nenhum e-mail real foi enviado.
 
-1. Entre em **Cobranças Sicoob**.
-2. Abra a aba **Pendentes** ou **Cobrados**.
-3. Clique em **Enviar cobrança individual** ou **Reenviar cobrança**.
-4. Confira empresa, documento, vencimento, valor e destinatários.
-5. Confirme o envio na segunda etapa.
-
-O lote também aceita títulos já cobrados, respeitando o limite atual de até 5 por operação.
-
-## Regras de segurança
-
-- O DDA ou a data de vencimento não disparam e-mails automaticamente.
-- O operador decide quando enviar ou reenviar e confirma cada operação.
-- Títulos pagos/cancelados não podem ser cobrados enquanto permanecerem nesses status.
-- Se uma tentativa estiver `processing` ou `review`, ou o resultado do Zoho for incerto, o sistema exige conferência na pasta **Enviados** antes de nova tentativa.
-- O histórico não é apagado nem reescrito; cada reenvio confirmado ganha seu próprio registro em `hsn_send_jobs`.
-
-## Validação desta entrega
-
-- Testes locais: `node tests/test-sicoob-recovery.cjs`, `node tests/test-zoho-manual-resend.cjs`, `node tests/test-dda-status.cjs`, `node tests/test-auto-reconcile.cjs`, `node tests/test-bank-file-proof.cjs`.
-- Sintaxe TypeScript da Edge Function verificada por transpilation.
-- Sintaxe JavaScript do módulo de cobranças verificada com Node.
-- Regras locais verificadas: vencimento futuro permitido, status `sent` permitido, `paid` e `cancelled` bloqueados.
-- A implantação no Supabase e o envio real pelo Zoho ainda precisam ser validados no ambiente do hotel. Nenhum e-mail foi enviado durante a preparação deste pacote.
+Não apague registros anteriores para liberar reenvios. Tentativas incertas precisam de conferência na pasta Enviados do Zoho.

@@ -8,7 +8,7 @@ const titles={approvals:'Central de aprovação',reconciliation:'Conciliação b
  * parcial ou cache misto deixa um dos módulos sem carregar. */
 const hsnFinancialModules=Object.freeze({
  communications:{global:'HSN_COMMUNICATIONS',path:'js/hsn93-communications.js',title:'Central de comunicação',method:'load'},
- sicoob_collections:{global:'HSN_SICOOB',path:'js/sicoob-collections.js',title:'Cobranças Sicoob',method:'load'},
+ sicoob_collections:{global:'HSN_SICOOB',path:'js/sicoob-collections.js?v=9-9-20261112-2',title:'Cobranças Sicoob',method:'load'},
  billing_send:{global:'HSN_FATURAMENTO',path:'js/hsn92-faturamento.js',title:'Enviar faturamento',method:'show'}
 });
 const hsnPendingModuleScripts=new Map();
