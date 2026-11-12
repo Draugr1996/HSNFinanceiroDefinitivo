@@ -32,7 +32,7 @@ async function hsnGetFinancialModule(name){
  if(!hsnPendingModuleScripts.has(name)){
   const task=new Promise((resolve,reject)=>{
    const sc=document.createElement('script');sc.async=true;
-   sc.src=spec.path+'?v=9-4-1-20261104-recovery';
+   sc.src=spec.path+'?v=9-8-20261112-recovery';
    sc.onload=()=>typeof window[spec.global]?.[spec.method]==='function'?resolve(window[spec.global]):reject(Error('Arquivo carregado, mas '+spec.global+' não inicializou.'));
    sc.onerror=()=>reject(Error('Não foi possível carregar '+spec.path+'. Verifique se o arquivo existe na pasta js do GitHub.'));
    document.head.append(sc);
@@ -108,7 +108,7 @@ function button(text,action,cls='secondary'){const node=el('button',text,cls);no
 async function operation(fn){if(busy)return;busy=true;document.querySelectorAll('button[type="submit"]').forEach(b=>b.disabled=true);try{requireOnline();await fn();}catch(e){failure(e);}finally{busy=false;document.querySelectorAll('button[type="submit"]').forEach(b=>b.disabled=false);}}
 function resetPrivate(){
  HSN_THEME.reset();
- window.HSN_FINANCE?.reset();loadToken++;user=null;rows=[];templates=[];editing=null;waSupplier=null;$('records').replaceChildren();$('fields').replaceChildren();$('wa-text').value='';$('password').value='';$('editor').close();$('whatsapp').close();$('app').hidden=true;$('login').hidden=false;$('logout').hidden=true;}
+ window.HSN_FINANCE?.reset();window.HSN_SICOOB?.reset();loadToken++;user=null;rows=[];templates=[];editing=null;waSupplier=null;$('records').replaceChildren();$('fields').replaceChildren();$('wa-text').value='';$('password').value='';$('editor').close();$('whatsapp').close();$('app').hidden=true;$('login').hidden=false;$('logout').hidden=true;}
 async function acceptSession(session){
  if(!session){resetPrivate();return;}
  if(session.user.id!==HSN_CONFIG.ownerId){await db.auth.signOut();resetPrivate();throw new Error('Este usuário não é o proprietário configurado.');}

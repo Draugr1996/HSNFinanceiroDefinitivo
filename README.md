@@ -1,25 +1,57 @@
-# Financeiro HSN 9.7 — DDA + conciliação com baixa automática controlada
+# Financeiro HSN 9.9 — Cobrança manual e reenvio controlado
 
-**Comece em `LEIA-ME-HSN-9-7-BAIXA-AUTOMATICA.txt`.** Esta versão amplia o Financeiro HSN 9.6 e mantém a conciliação OFX/CSV.
+Esta atualização preserva a central DDA e a conciliação da versão 9.7/9.8 e libera a cobrança manual no módulo Sicoob.
 
 ## O que mudou
 
-- Central DDA com caminho direto para conciliação, mantendo importação XLS/XLSX/CSV e classificação informada pela origem.
-- Conciliação OFX/CSV com triagem indexada, indicadores por situação e botão de registro em lote para correspondências documentalmente fortes.
-- Validação de débito com valor real exato, referência bancária estável, título DDA único, conta existente e dados de beneficiário/código de barras presentes no extrato.
-- CSV com movimentações liquidadas: exige saldo da movimentação ou situação liquidada com identificador explícito de transação. Um simples CSV de DDA/agendamento não desencadeia baixa.
-- Baixas gravadas por função SQL transacional com bloqueio de duplicidade, trilha de auditoria e consulta do histórico no painel.
-- Coluna `dda_charges.linked_payable_id` para vincular cobrança DDA a conta preexistente, sem converter em nova conta duplicada.
+- Você pode iniciar uma cobrança antes ou depois do vencimento.
+- Um boleto já cobrado pode receber novo aviso quando você solicitar novamente.
+- O botão passa a mostrar **Reenviar cobrança** para títulos marcados como cobrados.
+- O sistema identifica o último envio confirmado no histórico novo ou no histórico legado e registra cada novo envio como uma operação separada.
+- Cada envio continua exigindo prévia e duas confirmações na tela.
+- O servidor valida os dados do título, destinatários, histórico e autorização assinada antes de chamar o Zoho.
+- Títulos marcados como pagos ou cancelados continuam bloqueados.
+- Tentativas em processamento ou com resultado incerto continuam bloqueadas até conferência manual no Zoho.
+- Após o Zoho confirmar o envio, o título fica com status `sent` e `sent_at` atualizado.
+
+## Arquivos alterados
+
+- `index.html`
+- `js/sicoob-collections.js`
+- `service-worker.js`
+- `supabase/functions/zoho-send-mail/index.ts`
 
 ## Instalação
 
-1. Faça backup dos arquivos e do banco.
-2. No Supabase SQL Editor, aplique a migração **`sql/HSN-9-7-conciliacao-automatica.sql`**, após as migrações 8.6 e 9.6.
-3. Atualize o site no GitHub Pages, incluindo `js/hsn97-auto-reconcile.js`, `js/hsn90-modules.js`, `css/hsn97-auto-reconcile.css`, `index.html`, `service-worker.js`, `js/phase4.js` e `js/hsn96-dda-intel.js`.
-4. Na Central DDA, importe o relatório do banco. Depois clique **Conciliar DDA + extrato**, importe OFX/CSV e confirme as baixas identificadas no painel.
+1. Faça backup do repositório e do Supabase.
+2. Atualize o site no GitHub Pages com os arquivos do projeto.
+3. No Supabase, abra **Edge Functions → zoho-send-mail**.
+4. Substitua o código da função pelo conteúdo de `supabase/functions/zoho-send-mail/index.ts` e faça o deploy.
+5. Não é necessária uma nova variável de ambiente nem migração SQL para estas alterações. A função usa as mesmas tabelas, variáveis e credenciais já presentes no código recebido.
+6. Atualize o site com recarga forçada (Ctrl+F5) ou feche e abra novamente o navegador.
 
-## Limites e controles
+## Como usar
 
-O DDA **não** é comprovante de pagamento. Não há acesso em tempo real ao Sicoob, nem autorização/execução de transferências: o aplicativo trabalha com os arquivos importados. A baixa **não ocorre silenciosamente ao importar**: o operador confirma um lote com evidência bancária; situações ambíguas seguem para revisão manual. O backend verifica novamente os dados e rejeita operações duplicadas.
+1. Entre em **Cobranças Sicoob**.
+2. Abra a aba **Pendentes** ou **Cobrados**.
+3. Clique em **Enviar cobrança individual** ou **Reenviar cobrança**.
+4. Confira empresa, documento, vencimento, valor e destinatários.
+5. Confirme o envio na segunda etapa.
 
-Testes locais: `node tests/test-auto-reconcile.cjs`, `node tests/test-bank-file-proof.cjs`, `node tests/test-dda-status.cjs`. A migração SQL e a operação contra o Supabase do hotel **não foram executadas/testadas** nesta sessão.
+O lote também aceita títulos já cobrados, respeitando o limite atual de até 5 por operação.
+
+## Regras de segurança
+
+- O DDA ou a data de vencimento não disparam e-mails automaticamente.
+- O operador decide quando enviar ou reenviar e confirma cada operação.
+- Títulos pagos/cancelados não podem ser cobrados enquanto permanecerem nesses status.
+- Se uma tentativa estiver `processing` ou `review`, ou o resultado do Zoho for incerto, o sistema exige conferência na pasta **Enviados** antes de nova tentativa.
+- O histórico não é apagado nem reescrito; cada reenvio confirmado ganha seu próprio registro em `hsn_send_jobs`.
+
+## Validação desta entrega
+
+- Testes locais: `node tests/test-sicoob-recovery.cjs`, `node tests/test-zoho-manual-resend.cjs`, `node tests/test-dda-status.cjs`, `node tests/test-auto-reconcile.cjs`, `node tests/test-bank-file-proof.cjs`.
+- Sintaxe TypeScript da Edge Function verificada por transpilation.
+- Sintaxe JavaScript do módulo de cobranças verificada com Node.
+- Regras locais verificadas: vencimento futuro permitido, status `sent` permitido, `paid` e `cancelled` bloqueados.
+- A implantação no Supabase e o envio real pelo Zoho ainda precisam ser validados no ambiente do hotel. Nenhum e-mail foi enviado durante a preparação deste pacote.
