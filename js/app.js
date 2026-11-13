@@ -8,7 +8,7 @@ const titles={approvals:'Central de aprovação',reconciliation:'Conciliação b
  * parcial ou cache misto deixa um dos módulos sem carregar. */
 const hsnFinancialModules=Object.freeze({
  communications:{global:'HSN_COMMUNICATIONS',path:'js/hsn93-communications.js',title:'Central de comunicação',method:'load'},
- sicoob_collections:{global:'HSN_SICOOB',path:'js/sicoob-collections.js?v=9-9-20261112-2',title:'Cobranças Sicoob',method:'load'},
+ sicoob_collections:{global:'HSN_SICOOB',path:'js/sicoob-collections.js?v=10-20261113',title:'Cobranças Sicoob',method:'load'},
  billing_send:{global:'HSN_FATURAMENTO',path:'js/hsn92-faturamento.js',title:'Enviar faturamento',method:'show'}
 });
 const hsnPendingModuleScripts=new Map();
@@ -32,7 +32,7 @@ async function hsnGetFinancialModule(name){
  if(!hsnPendingModuleScripts.has(name)){
   const task=new Promise((resolve,reject)=>{
    const sc=document.createElement('script');sc.async=true;
-   sc.src=spec.path+'?v=9-8-20261112-recovery';
+   sc.src=spec.path+(spec.path.includes('?')?'&':'?')+'v=10-20261113';
    sc.onload=()=>typeof window[spec.global]?.[spec.method]==='function'?resolve(window[spec.global]):reject(Error('Arquivo carregado, mas '+spec.global+' não inicializou.'));
    sc.onerror=()=>reject(Error('Não foi possível carregar '+spec.path+'. Verifique se o arquivo existe na pasta js do GitHub.'));
    document.head.append(sc);
@@ -107,7 +107,7 @@ function el(tag,text,cls){const node=document.createElement(tag);if(text!==undef
 function button(text,action,cls='secondary'){const node=el('button',text,cls);node.type='button';node.addEventListener('click',action);return node;}
 async function operation(fn){if(busy)return;busy=true;document.querySelectorAll('button[type="submit"]').forEach(b=>b.disabled=true);try{requireOnline();await fn();}catch(e){failure(e);}finally{busy=false;document.querySelectorAll('button[type="submit"]').forEach(b=>b.disabled=false);}}
 function resetPrivate(){
- HSN_THEME.reset();
+ HSN_THEME.reset();window.HSN_WORKSPACE?.reset();
  window.HSN_FINANCE?.reset();window.HSN_SICOOB?.reset();loadToken++;user=null;rows=[];templates=[];editing=null;waSupplier=null;$('records').replaceChildren();$('fields').replaceChildren();$('wa-text').value='';$('password').value='';$('editor').close();$('whatsapp').close();$('app').hidden=true;$('login').hidden=false;$('logout').hidden=true;}
 async function acceptSession(session){
  if(!session){resetPrivate();return;}
@@ -116,6 +116,7 @@ async function acceptSession(session){
 }
 async function load(){
  loadToken++;
+ if(window.HSN_WORKSPACE?.handles(view)){if(user)return HSN_WORKSPACE.load(view);return;}
  if(view==='communications'||view==='sicoob_collections'||view==='billing_send'){if(user)hsnOpenFinancial(view);return;}
  if(view==='zoho_connect'){if(user)HSN_ZOHO.show();return;}
  if(window.HSN_FINANCE?.handles(view))return HSN_FINANCE.load(view);
@@ -124,6 +125,7 @@ async function load(){
  catch(e){if(token!==loadToken)return;rows=[];$('records').replaceChildren(el('p','Não foi possível consultar. Clique em Atualizar após recuperar a conexão.'));failure(e);}
 }
 function render(){
+ if(window.HSN_WORKSPACE?.handles(view))return HSN_WORKSPACE.render();
  HSN_THEME.describe(view);
  $('search').closest('.search-wrap').hidden=false;
  if(view==='communications'||view==='sicoob_collections')return hsnRenderFinancial(view);

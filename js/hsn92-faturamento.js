@@ -3,6 +3,7 @@ window.HSN_FATURAMENTO=(()=>{'use strict';
 const $=id=>document.getElementById(id);
 const make=(tag,text,cls)=>{const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(cls)el.className=cls;return el;};
 const ALLOWED=/\.(pdf|xml|png|jpe?g)$/i;
+let linkedTitleId=null;const fileRoles=new Map();const fileKey=f=>f.name+'|'+f.size+'|'+f.lastModified;
 const MAX_FILE=10*1024*1024,MAX_TOTAL=25*1024*1024,MAX_COUNT=3,MAX_SIGN=750*1024;
 const SENDER='faturamento@hotelserranegra.com.br';
 const parseEmails=v=>String(v||'').split(/[;,\n]+/).map(x=>x.trim()).filter(Boolean);
@@ -19,7 +20,7 @@ const getClient=()=>window.HSN_ZOHO_CLIENT;
 function getNF(){const v=(nfInput?.value||'').trim().replace(/\s+/g,' ');if(v&&!/^[\p{L}\p{N}./-]{1,35}$/u.test(v))throw Error('O número da NF deve ter até 35 caracteres (letras, números, /, ponto ou hífen).');return v;}
 function getEmails(){const arr=parseEmails(recipientInput?.value);if(!arr.length)throw Error('Informe pelo menos um e-mail.');if(arr.length>8||arr.some(x=>!isEmail(x)))throw Error('Confira os e-mails (máximo 8, separados por ponto e vírgula).');if(new Set(arr.map(x=>x.toLowerCase())).size!==arr.length)throw Error('Remova os destinatários repetidos.');return arr;}
 function validateSelection(arr){if(!arr.length)throw Error('Selecione pelo menos um arquivo.');if(arr.length>MAX_COUNT)throw Error('São permitidos até três documentos por envio.');let sum=0;const seen=new Set();for(const f of arr){if(!ALLOWED.test(f.name)||!f.size||f.size>MAX_FILE)throw Error('Arquivo inválido ou maior que 10 MB: '+f.name);const key=f.name.toLowerCase()+'|'+f.size;if(seen.has(key))throw Error('Arquivo selecionado duas vezes: '+f.name);seen.add(key);sum+=f.size;}if(sum>MAX_TOTAL)throw Error('Os documentos ultrapassam 25 MB.');}
-function showFiles(){const wrap=$('hsn-billing-selected-files');if(!wrap)return;wrap.replaceChildren();if(!files.length){wrap.append(make('p','Nenhum documento selecionado.','hsn-billing-muted'));return;}for(const f of files){const row=make('div',undefined,'hsn-billing-picked');row.append(make('span','📄  '+f.name),make('small',fmtSize(f.size)));wrap.append(row);}wrap.append(make('p',files.length+' arquivo(s) · '+fmtSize(files.reduce((s,x)=>s+x.size,0)),'hsn-billing-muted'));}
+function showFiles(){const wrap=$('hsn-billing-selected-files');if(!wrap)return;wrap.replaceChildren();if(!files.length){wrap.append(make('p','Nenhum documento selecionado.','hsn-billing-muted'));return;}for(const f of files){const row=make('div',undefined,'hsn-billing-picked');row.append(make('span','📄 '+f.name),make('small',fmtSize(f.size)));const label=make('label','Tipo deste documento'),select=make('select');select.setAttribute('aria-label','Tipo de '+f.name);for(const [k,t]of [['','Selecione o tipo'],['boleto','Boleto'],['extrato','Extrato da hospedagem'],['nota','Nota fiscal']])select.append(new Option(t,k));select.value=fileRoles.get(fileKey(f))||'';select.onchange=()=>fileRoles.set(fileKey(f),select.value);label.append(select);row.append(label);wrap.append(row);}wrap.append(make('p',files.length+' arquivo(s) · '+fmtSize(files.reduce((s,x)=>s+x.size,0))+' · Confira o tipo de cada arquivo antes de enviar.','hsn-billing-muted'));}
 function chooseFiles(){try{const chosen=Array.from(fileInput.files||[]);validateSelection(chosen);files=chosen;showFiles();say('Documentos prontos. Nenhum e-mail foi enviado.');}catch(e){files=[];fileInput.value='';showFiles();say(e.message,'error');}}
 function updatePreview(){let nf='';try{nf=getNF();}catch(_){nf='';}if(previewSubject)previewSubject.textContent='Assunto: '+subject(nf);if(previewBody)previewBody.textContent=message(nf);}
 async function fingerprint(to,arr,nf){const chunks=[new TextEncoder().encode(to.map(x=>x.toLowerCase()).sort().join(';')+'\nNF:'+nf+'\n')];for(const f of arr){chunks.push(new TextEncoder().encode(f.name+'|'+f.size+'\n'));chunks.push(new Uint8Array(await f.arrayBuffer()));}const len=chunks.reduce((s,x)=>s+x.byteLength,0),bytes=new Uint8Array(len);let pos=0;for(const x of chunks){bytes.set(x,pos);pos+=x.byteLength;}const hash=new Uint8Array(await crypto.subtle.digest('SHA-256',bytes));return 'NF-'+Array.from(hash,x=>x.toString(16).padStart(2,'0')).join('').slice(0,40);}
@@ -243,28 +244,35 @@ async function refreshHistory(){
  }catch(_){historyRecords=[];historyNode.replaceChildren(make('p','Histórico indisponível. Verifique a conexão com o Supabase.','hsn-billing-muted'));if(historyCountNode)historyCountNode.textContent='Histórico indisponível';}
 }
 function prepareTask(){
- const to=getEmails(),nf=getNF();validateSelection(files);
+ const to=getEmails(),nf=getNF();validateSelection(files);const slots=files.map(f=>fileRoles.get(fileKey(f))||'');if(slots.some(k=>!k)||new Set(slots).size!==slots.length)throw Error('Selecione um tipo diferente para cada anexo: boleto, extrato ou nota fiscal.');
  const company=(companyInput?.value||'').trim();
  if(company.length>160)throw Error('Nome da empresa com mais de 160 caracteres.');
- return {id:crypto.randomUUID(),requestId:crypto.randomUUID(),to,nf,company:company||'Faturamento avulso',files:files.slice(),signature:signatureFile,status:'ready',error:''};
+ return {slots,linkedTitleId:linkedTitleId,id:crypto.randomUUID(),requestId:crypto.randomUUID(),to,nf,company:company||'Faturamento avulso',files:files.slice(),signature:signatureFile,status:'ready',error:''};
 }
 function taskSummary(task){return `${task.company} | NF ${task.nf||'não informada'} | ${task.to.join('; ')} | ${task.files.map(f=>f.name).join(', ')}`;}
 async function dispatchTask(task){
  if(!navigator.onLine)throw Error('Sem internet. Nenhum envio foi iniciado.');
  validateSelection(task.files);
  const client=getClient();if(!client)throw Error('Supabase indisponível.');
+ if(task.linkedTitleId){const title=await client.from('sicoob_collections').select('company,nf_number').eq('id',task.linkedTitleId).single();if(title.error)throw title.error;if(title.data.company!==task.company||String(title.data.nf_number||'')!==task.nf)throw Error('Empresa/NF difere do título vinculado. Corrija o cadastro antes do envio.');}
  const ref=await fingerprint(task.to,task.files,task.nf);
  const form=new FormData();form.append('request_id',task.requestId);form.append('company',task.company);form.append('reference',ref);
  form.append('to',task.to.join(';'));form.append('cc','');form.append('nf_number',task.nf);
  form.append('subject',subject(task.nf));form.append('content',message(task.nf));form.append('confirm','ENVIAR_FATURAMENTO');
- ['boleto','extrato','nota'].forEach((slot,i)=>{if(task.files[i])form.append(slot,task.files[i],task.files[i].name);});
+ task.files.forEach((file,i)=>{form.append(task.slots[i],file,file.name);});
  if(task.signature)form.append('signature_image',task.signature,task.signature.name);
  const {data,error}=await client.functions.invoke('zoho-billing-mail',{body:form});
  if(error){let detail='';try{if(error.context?.json)detail=(await error.context.json()).error||'';}catch(_){}throw Error(detail||error.message||'Resposta não confirmada.');}
  if(!data?.success)throw Error(data?.error||'O Zoho não confirmou o envio.');
+ // E-mail confirmado e saldo financeiro são registros diferentes.
+ if(task.linkedTitleId){
+  try{const fresh=await client.from('sicoob_collections').select('updated_at').eq('id',task.linkedTitleId).single();if(fresh.error)throw fresh.error;
+   const saved=await client.rpc('hsn10_mark_billing_sent',{p_id:task.linkedTitleId,p_expected_updated_at:fresh.data.updated_at,p_reference:'Zoho confirmou: '+task.requestId+' | '+task.to.join('; ')});if(saved.error)throw saved.error;
+  }catch(e){alert('O Zoho confirmou o envio, mas o vínculo no faturamento não foi atualizado: '+e.message+'. Registre a confirmação em Faturamento do hotel. Não repita o e-mail por este motivo.');}
+ }
  return data;
 }
-function clearDraft(){files=[];fileInput.value='';recipientInput.value='';nfInput.value='';if(companyInput)companyInput.value='';showFiles();updatePreview();emailAssistant?.refresh();renderSaved();}
+function clearDraft(){linkedTitleId=null;fileRoles.clear();files=[];fileInput.value='';recipientInput.value='';nfInput.value='';if(companyInput)companyInput.value='';showFiles();updatePreview();emailAssistant?.refresh();renderSaved();}
 async function send(){
  if(busy||uncertain)return;let task;
  try{task=prepareTask();}catch(e){say(e.message,'error');return;}
@@ -324,7 +332,7 @@ async function sendPreparedBatch(){
  }finally{busy=false;sendBtn.disabled=uncertain;drawBatch();}
 }
 
-function show(){const client=getClient(),app=$('app');if(!client||!app||app.hidden)return;$('new').hidden=true;const search=$('search')?.closest('.search-wrap');if(search)search.hidden=true;$('view-title').textContent='Envio de faturamento';$('view-description').textContent='Escolha os destinatários, informe a NF e anexe os documentos já emitidos.';for(const id of ['summary','finance-controls','calendar-board','records'])$(id).replaceChildren();const panel=make('section',undefined,'hsn-billing hsn-billing-simple');const header=make('div',undefined,'hsn-billing-top'),info=make('div');info.append(make('small','HOTEL SERRA NEGRA · ZOHO MAIL','hsn-billing-kicker'),make('h2','Enviar faturamento'),make('p','E-mails salvos, número da NF no assunto, mensagem formal e assinatura de Vanderson Santos.'));header.append(info,make('div',SENDER+' · v9.2.8','hsn-billing-sender'));panel.append(header);
+function show(){const requested=window.HSN_BILLING_CONTEXT;window.HSN_BILLING_CONTEXT=null;if(requested){linkedTitleId=requested.id;}else linkedTitleId=null;const client=getClient(),app=$('app');if(!client||!app||app.hidden)return;$('new').hidden=true;const search=$('search')?.closest('.search-wrap');if(search)search.hidden=true;$('view-title').textContent='Envio de faturamento';$('view-description').textContent='Escolha os destinatários, informe a NF e anexe os documentos já emitidos.';for(const id of ['summary','finance-controls','calendar-board','records'])$(id).replaceChildren();const panel=make('section',undefined,'hsn-billing hsn-billing-simple');const header=make('div',undefined,'hsn-billing-top'),info=make('div');info.append(make('small','HOTEL SERRA NEGRA · ZOHO MAIL','hsn-billing-kicker'),make('h2','Enviar faturamento'),make('p','E-mails salvos, número da NF no assunto, mensagem formal e assinatura de Vanderson Santos.'));header.append(info,make('div',SENDER+' · v9.2.8','hsn-billing-sender'));panel.append(header);
 const form=make('section',undefined,'hsn-billing-compose');form.append(make('h3','1. Destinatários e nota fiscal'));const label=make('label','E-mail ou e-mails de destino','hsn-billing-label');recipientInput=make('textarea');recipientInput.rows=1;recipientInput.placeholder='financeiro@empresa.com.br; contas@empresa.com.br';recipientInput.addEventListener('input',renderSaved);label.append(recipientInput);form.append(label);
 const emailTools=make('div',undefined,'hsn-billing-contact-toolbar');
 const save=make('button','Salvar e-mails','secondary');save.type='button';save.addEventListener('click',saveOnClick);
@@ -347,7 +355,7 @@ const sendArea=make('section',undefined,'hsn-billing-send-area');sendArea.append
  // Se o resultado do envio foi incerto, obrigar a conferencia no Zoho para evitar reenvio acidental.
  if(uncertain&&!confirm('O envio anterior não foi confirmado. Você já conferiu a pasta Enviados do Zoho antes de começar um novo envio?'))return;
  // Limpa somente os campos deste envio. Contatos salvos, assinatura e histórico permanecem intactos.
- recipientInput.value='';
+ linkedTitleId=null;fileRoles.clear();recipientInput.value='';
  nfInput.value='';
  files=[];
  fileInput.value='';
@@ -370,5 +378,5 @@ const sendArea=make('section',undefined,'hsn-billing-send-area');sendArea.append
  // Foco sem nova rolagem: cursor pronto para digitar o proximo destinatario.
  recipientInput.focus({preventScroll:true});
 });sendArea.append(reset);panel.append(sendArea);queueNode=make('section',undefined,'hsn94-queue');panel.append(queueNode);drawBatch();
-const historySection=make('section',undefined,'hsn-billing-history-section');const historyHeader=make('div',undefined,'hsn-billing-history-header');historyHeader.append(make('h3','Últimos envios'));historyCountNode=make('span','Carregando…','hsn-billing-history-count');historyHeader.append(historyCountNode);historySection.append(historyHeader);historyNode=make('div',undefined,'hsn-billing-history-list');historySection.append(historyNode);panel.append(historySection);$('records').append(panel);window.HSN_EMAIL_ASSIST?.invalidate();const ac=getClient();if(ac){ac.auth.getUser().then(({data})=>{if(recipientInput?.isConnected)emailAssistant=window.HSN_EMAIL_ASSIST?.bind(recipientInput,{client:ac,userId:data?.user?.id});}).catch(()=>{});}document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view==='billing_send'));showFiles();updatePreview();updateSignatureView();refreshSaved();loadSignature();refreshHistory();}
+const historySection=make('section',undefined,'hsn-billing-history-section');const historyHeader=make('div',undefined,'hsn-billing-history-header');historyHeader.append(make('h3','Últimos envios'));historyCountNode=make('span','Carregando…','hsn-billing-history-count');historyHeader.append(historyCountNode);historySection.append(historyHeader);historyNode=make('div',undefined,'hsn-billing-history-list');historySection.append(historyNode);panel.append(historySection);$('records').append(panel);window.HSN_EMAIL_ASSIST?.invalidate();const ac=getClient();if(ac){ac.auth.getUser().then(({data})=>{if(recipientInput?.isConnected)emailAssistant=window.HSN_EMAIL_ASSIST?.bind(recipientInput,{client:ac,userId:data?.user?.id});}).catch(()=>{});}document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view==='billing_send'));if(requested){companyInput.value=requested.company;nfInput.value=requested.nf||'';}showFiles();updatePreview();updateSignatureView();refreshSaved();loadSignature();refreshHistory();}
 return {show};})();

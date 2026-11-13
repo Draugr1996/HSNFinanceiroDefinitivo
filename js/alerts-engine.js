@@ -8,7 +8,7 @@ function variation(accounts,p,percent=30){if(p.actual_amount===null||p.actual_am
 function payables(accounts,documents,config={},today=HSN_DATES.today()){
  const s={...payableDefaults,...config},out=[];
  const push=(p,category,detail,severity='info')=>out.push({id:p.id+':'+category,module:'payables',record_id:p.id,title:p.title,date:p.due_date,category,detail,severity});
- for(const p of accounts){if(p.archived)continue;const unpaid=p.payment_status!=='paid',diff=delta(today,p.due_date),files=documents.filter(d=>d.payable_id===p.id),month=p.competence.slice(0,7);
+ for(const p of accounts){if(p.archived||p.workflow_status==='cancelled')continue;const unpaid=p.payment_status!=='paid',diff=delta(today,p.due_date),files=documents.filter(d=>d.payable_id===p.id),month=p.competence.slice(0,7);
  if(unpaid){if(diff<0)push(p,'overdue',Math.abs(diff)+' dia(s) de atraso','danger');else if(diff===0)push(p,'today','Vence hoje','warning');else if(s.lead_days.includes(diff))push(p,'upcoming','Vence em '+diff+' dia(s)','info');
  if(s.missing_bill&&p.arrival_day){const arrival=HSN_DATES.monthDay(month,p.arrival_day);if(today>arrival&&!files.some(d=>d.document_type==='boleto'))push(p,'missing_bill','Boleto esperado desde '+HSN_DATES.br(arrival),'warning');}
  if(s.waiting_approval&&p.approval_status==='waiting')push(p,'approval','Aguardando aprovação externa','warning');}
@@ -24,6 +24,6 @@ function commissions(records,reviews,config={},today=HSN_DATES.today()){
  if(s.monthly_reminder&&review?.review_status!=='completed'){const diff=delta(today,date);if(diff<=0||s.lead_days.includes(diff))out.unshift({id:'monthly:'+month,module:'commissions',record_id:review?.id||null,title:'Conferência mensal de comissões',date,category:'monthly',detail:diff<0?'Checklist mensal ainda não concluído':diff===0?'Dia da conferência mensal':'Checklist mensal em '+diff+' dia(s)',severity:diff<0?'danger':'warning',month});}
  return out.sort((a,b)=>a.date.localeCompare(b.date));
 }
-function summary(records,module,today=HSN_DATES.today()){const active=records.filter(r=>!r.archived&&(module==='payables'?r.payment_status!=='paid':r.review_status!=='confirmed'));const weekEnd=HSN_DATES.add(today,7);const dueToday=active.filter(r=>r.due_date===today),week=active.filter(r=>r.due_date>today&&r.due_date<=weekEnd),late=active.filter(r=>r.due_date<today);return {module,today:dueToday,week,late};}
+function summary(records,module,today=HSN_DATES.today()){const active=records.filter(r=>!r.archived&&(module==='payables'?r.payment_status!=='paid'&&r.workflow_status!=='cancelled':r.review_status!=='confirmed'));const weekEnd=HSN_DATES.add(today,7);const dueToday=active.filter(r=>r.due_date===today),week=active.filter(r=>r.due_date>today&&r.due_date<=weekEnd),late=active.filter(r=>r.due_date<today);return {module,today:dueToday,week,late};}
 root.HSN_ALERT_ENGINE={payableDefaults,commissionDefaults,delta,history,variation,payables,commissions,summary};
 })(typeof window!=='undefined'?window:globalThis);

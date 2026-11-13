@@ -1,0 +1,14 @@
+{
+  "name": "hsn-financeiro",
+  "version": "10.0.0",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/financial-core.test.cjs && node tests/sql-integration.mjs && node tests/dom-integration.mjs",
+    "test:browser": "node tests/browser-integration.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.16",
+    "playwright": "1.56.1",
+    "jsdom": "31.0.1"
+  }
+}

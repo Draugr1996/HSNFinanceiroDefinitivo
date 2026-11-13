@@ -4,7 +4,7 @@ const labels={payables:'Contas a pagar',commissions:'Comissões',dda:'DDA'};
 let settings=[],devices=[],deliveries=[],config=null,currentEndpoint='',version=0;
 const handles=v=>v==='push';
 const supported=()=>root.isSecureContext&&'serviceWorker' in navigator&&'PushManager' in root&&'Notification' in root;
-function initialView(){const value=location.hash.slice(1);return ['alerts','commission_alerts','dda'].includes(value)?value:'payables';}
+function initialView(){const value=location.hash.slice(1);return ['alerts','commission_alerts','dda'].includes(value)?value:'dashboard';}
 function requests(all){return [all('push_settings'),all('push_subscriptions'),db.from('push_deliveries').select('id,module,kind,state,status_code,error_note,created_at').order('created_at',{ascending:false}).order('id').limit(20).then(check)];}
 function receive(results){[settings,devices,deliveries]=results;if(settings.length!==3)throw Error('Execute fase-6-push.sql antes de atualizar o app.');}
 function reset(){version++;settings=[];devices=[];deliveries=[];config=null;currentEndpoint='';}

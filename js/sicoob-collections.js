@@ -126,7 +126,7 @@ function installSharedPickerStyle(){
 }
 async function fetchData(){
  const [a,b,h,j]=await Promise.all([
-  db.from('sicoob_collections').select('*').order('due_date',{ascending:true}),
+  HSN_FINANCE.all('sicoob_collections').then(data=>({data,error:null})),
   db.from('sicoob_contacts').select('*').eq('owner_id',user.id),
   db.from('sicoob_collection_dispatches').select('id,collection_id,owner_id,status,recipient_email,sent_at,created_at').eq('owner_id',user.id).order('created_at',{ascending:false}).limit(1000),
   db.from('hsn_send_jobs').select('id,status,snapshot,created_at').eq('owner_id',user.id).eq('kind','collection').order('created_at',{ascending:false}).limit(1000)
@@ -149,12 +149,13 @@ const docNumber=r=>String(r.external_reference||'').trim();
 const emailsFor=c=>String(c?.email||'').split(/[;,\n]+/).map(x=>x.trim()).filter(Boolean);
 const validEmail=x=>/^[^\s@;,]+@[^\s@;,]+\.[^\s@;,]+$/.test(x);
 function message(r){return `Prezados, bom dia!\n\nIdentificamos em nosso controle financeiro uma pendência referente ao boleto abaixo:\n\nEmpresa: ${r.company}\nNúmero do Documento: ${docNumber(r)||'[NÃO INFORMADO]'}\nVencimento: ${r.due_date.split('-').reverse().join('/')}\nValor original: ${fmt(r.amount)}\n\nSolicitamos, por gentileza, a verificação da pendência e, caso o pagamento já tenha sido realizado, o envio do respectivo comprovante para atualização de nossos registros.\n\nPermanecemos à disposição para quaisquer esclarecimentos.\n\nAtenciosamente,\nVanderson Santos\nSupervisor Administrativo Financeiro\nHotel Serra Negra\nfaturamento@hotelserranegra.com.br`;}
+const displayStatus=r=>r.cancelled_at?'cancelled':r.status;
 const wasSent=r=>r.status==='sent'||!!r.sent_at||dispatches.some(d=>d.collection_id===r.id&&d.status==='sent');
 const unresolved=r=>!!historyError||dispatches.some(d=>d.collection_id===r.id&&['processing','review','failed'].includes(d.status));
-const eligible=r=>['pending','sent'].includes(r.status)&&!unresolved(r)&&emailsFor(contact(r.company)).length>0&&!!docNumber(r);
+const eligible=r=>!r.cancelled_at&&Number(r.paid_amount||0)===0&&['pending','sent'].includes(r.status)&&!unresolved(r)&&emailsFor(contact(r.company)).length>0&&!!docNumber(r);
 async function saveContact(company,primary,cc){const all=[primary.trim(),...cc.split(/[;,\n]+/).map(x=>x.trim()).filter(Boolean)];if(!all[0]||all.some(x=>!validEmail(x)))throw Error('Confira os endereços de e-mail em Para e CC.');if(new Set(all.map(x=>x.toLowerCase())).size!==all.length)throw Error('Há e-mails repetidos entre Para e CC.');check(await db.from('sicoob_contacts').upsert({owner_id:user.id,company,email:all.join('; ')},{onConflict:'owner_id,company'}));window.HSN_EMAIL_ASSIST?.invalidate();await fetchData();render();}
-async function importCsv(file){if(!file)return;try{const text=await file.text();const parsed=parse(csv(text.replace(/^\uFEFF/,'')));if(!parsed.length)throw Error('Nenhum boleto reconhecido.');const ok=confirm(`Foram encontrados ${parsed.length} títulos, totalizando ${fmt(parsed.reduce((s,r)=>s+r.amount,0))}.\n\nImportar e atualizar títulos existentes? Os status atuais serão preservados.`);if(!ok)return;const existing=new Set(items.map(x=>x.reference+'|'+x.due_date));const fresh=parsed.filter(x=>!existing.has(x.reference+'|'+x.due_date));const updates=parsed.filter(x=>existing.has(x.reference+'|'+x.due_date)&&x.external_reference&&x.external_reference!==items.find(y=>y.reference===x.reference&&y.due_date===x.due_date)?.external_reference);if(updates.length){for(const x of updates){const old=items.find(y=>y.reference===x.reference&&y.due_date===x.due_date);check(await db.from('sicoob_collections').update({external_reference:x.external_reference}).eq('id',old.id));}}if(fresh.length)check(await db.from('sicoob_collections').upsert(fresh.map(x=>({...x,owner_id:user.id,status:'pending'})),{onConflict:'owner_id,reference,due_date'}));await fetchData();render();alert(`${fresh.length} títulos novos importados. ${parsed.length-fresh.length} já cadastrados; ${updates.length} número(s) de documento atualizado(s), sem alterar a situação dos boletos.`);}catch(e){alert('Falha na importação: '+e.message);}}
-async function setStatus(r,status){if(!confirm(`Alterar ${r.company} / ${r.reference} para ${status==='paid'?'pago':'pendente'}? Confira a situação no Sicoob.`))return;try{check(await db.from('sicoob_collections').update({status}).eq('id',r.id));await fetchData();render();}catch(e){alert(e.message);}}
+async function importCsv(file){if(busy)return;busy=true;try{await HSN_WORKSPACE.importSicoob(file,items,async()=>{await fetchData();render();});}catch(e){alert('Importação: '+e.message);}finally{busy=false;}}
+async function setStatus(r,status){HSN_WORKSPACE.navigate('receivables');notice('Localize o título e use Registrar recebimento ou Histórico e baixas para estornar.');}
 async function prepareIndividual(r){
  if(busy)return;
  busy=true;
@@ -174,7 +175,7 @@ async function prepareIndividual(r){
   }
   const preview=`EMPRESA: ${data.company}\nDOCUMENTO: ${data.document_number}\nVENCIMENTO: ${String(data.due_date).split('-').reverse().join('/')}\nVALOR: ${fmt(data.amount)}\nPARA: ${data.to}\nCC: ${(data.cc||[]).join('; ')||'(nenhum)'}\n\nASSUNTO: ${data.subject}\n\n${data.content}`;
    if(!data.approval_token)throw Error('Supabase não retornou autorização de envio.');
-   if(!confirm((wasSent(r)?'REENVIO SOLICITADO — uma nova cobrança será enviada.\n\n':'')+'PRIMEIRA CONFERÊNCIA — dados validados pelo Supabase:\n\n'+preview+'\n\nProsseguir para a confirmação final?'))return;
+   if(!confirm((wasSent(r)?'REENVIO SOLICITADO — o aviso do mesmo título será reenviado; a dívida permanece única.\n\n':'')+'PRIMEIRA CONFERÊNCIA — dados validados pelo Supabase:\n\n'+preview+'\n\nProsseguir para a confirmação final?'))return;
    if(!confirm('SEGUNDA CONFIRMAÇÃO — ENVIO REAL\n\nO Zoho enviará AGORA esta cobrança para '+data.to+(data.cc?.length?' (CC: '+data.cc.join('; ')+')':'')+'.\n\nVocê verificou a pendência no Sicoob, o número do documento e TODOS os destinatários?\n\nClique OK somente se autorizar o envio real.'))return;
    const {data:result,error:sendError}=await db.functions.invoke('zoho-send-mail',{
      body:{mode:'send_individual',collection_id:r.id,approval_token:data.approval_token}
@@ -324,19 +325,19 @@ function render(){
  const box=$('records');box.classList.add('sicoob-workspace');
  $('summary').classList.add('sicoob-summary');
  if(!ready){box.append(node('p','Preparando a central de cobranças…'));return;}
- const pending=items.filter(r=>r.status==='pending');
+ const pending=items.filter(r=>!r.cancelled_at&&HSN_MONEY.balance(r,'receivable').pending>0);
  const stat=(label,value,detail)=>{const el=node('article',undefined,'sicoob-stat');el.append(node('span',label,'sicoob-stat-label'),node('strong',value,'sicoob-stat-value'),node('small',detail,'sicoob-stat-detail'));return el;};
  $('summary').append(
   stat('Títulos pendentes',String(pending.length),'Aguardando conferência'),
-  stat('Valor pendente',fmt(pending.reduce((s,r)=>s+Number(r.amount),0)),'Valor original dos títulos'),
+  stat('Valor pendente',fmt(pending.reduce((s,r)=>s+HSN_MONEY.balance(r,'receivable').pending,0)),'Saldo pendente, incluindo cobranças enviadas'),
   stat('Empresas',String(new Set(pending.map(r=>clean(r.company))).size),'Sacados com pendências'),
   stat('E-mails cadastrados',String(pending.filter(r=>emailsFor(contact(r.company)).length>0).length),'Títulos com destinatário')
  );
  // O histórico fica no início, antes dos cartões, para dispensar rolagem longa.
  renderHistory(box);
  const tabs=node('nav',undefined,'sicoob-tabs');tabs.setAttribute('aria-label','Filtrar boletos por situação');
- for(const [key,label] of [['pending','Pendentes'],['sent','Cobrados'],['paid','Pagos']]){
-  const total=items.filter(r=>r.status===key).length;
+ for(const [key,label] of [['pending','Pendentes'],['sent','Cobrados'],['paid','Pagos'],['cancelled','Cancelados']]){
+  const total=items.filter(r=>displayStatus(r)===key).length;
   const tab=button(`${label} (${total})`,()=>{activeTab=key;render();});
   tab.className='sicoob-tab'+(activeTab===key?' active':'');
   tab.setAttribute('aria-pressed',String(activeTab===key));
@@ -350,21 +351,21 @@ function render(){
  const input=node('input');input.type='file';input.accept='.csv,text/csv';
  input.onchange=()=>{const file=input.files?.[0];importCsv(file);input.value='';};
  importLabel.append(input);bar.append(importLabel);
- bar.append(button('Selecionar elegíveis',()=>{const eligibleItems=items.filter(r=>r.status===activeTab&&eligible(r)).slice(0,5);selected.clear();eligibleItems.forEach(r=>selected.add(r.id));render();}),button('Limpar seleção',()=>{selected.clear();render();}));
+ bar.append(button('Selecionar elegíveis',()=>{const eligibleItems=items.filter(r=>displayStatus(r)===activeTab&&eligible(r)).slice(0,5);selected.clear();eligibleItems.forEach(r=>selected.add(r.id));render();}),button('Limpar seleção',()=>{selected.clear();render();}));
  const companyChoose=node('select');companyChoose.setAttribute('aria-label','Selecionar cobranças por empresa');
  companyChoose.append(new Option('Selecionar por empresa…',''));
  for(const name of [...new Set(items.filter(eligible).map(r=>r.company))].sort((a,b)=>a.localeCompare(b,'pt-BR')))companyChoose.append(new Option(name,name));
- companyChoose.onchange=()=>{if(!companyChoose.value)return;const batch=items.filter(r=>r.status===activeTab&&eligible(r)&&clean(r.company)===clean(companyChoose.value));selected.clear();batch.slice(0,5).forEach(r=>selected.add(r.id));reportBatchProgress(batch.length>5?'Selecionados 5 dos '+batch.length+' boletos desta empresa. Faça outro lote após este.':'Selecionados '+batch.length+' boleto(s) desta empresa.');render();};
+ companyChoose.onchange=()=>{if(!companyChoose.value)return;const batch=items.filter(r=>displayStatus(r)===activeTab&&eligible(r)&&clean(r.company)===clean(companyChoose.value));selected.clear();batch.slice(0,5).forEach(r=>selected.add(r.id));reportBatchProgress(batch.length>5?'Selecionados 5 dos '+batch.length+' boletos desta empresa. Faça outro lote após este.':'Selecionados '+batch.length+' boleto(s) desta empresa.');render();};
  bar.append(companyChoose);
  const send=button(`Enviar selecionados (${[...selected].filter(id=>items.some(r=>r.id===id&&eligible(r))).length})`,sendBatch);
  send.disabled=busy||![...selected].some(id=>items.some(r=>r.id===id&&eligible(r)));send.title='Máximo de 5 boletos por lote, com prévia e autorização final. Se houver falha, confira Enviados antes de repetir.';bar.append(send);
  panel.append(bar);batchProgressNode=node('p',batchProgress,'hsn94-batch-status');batchProgressNode.hidden=!batchProgress;panel.append(batchProgressNode);
  panel.append(node('p','Envio em lote: até 5 boletos elegíveis por operação. Confira todas as prévias e confirme antes do Zoho. O servidor verifica novamente status, histórico e destinatários; falhas interrompem o lote sem reenvio automático.','sicoob-notice'));
  const count=node('div',undefined,'sicoob-table-heading');
- count.append(node('h2',activeTab==='pending'?'Boletos pendentes':activeTab==='sent'?'Boletos cobrados':'Boletos pagos'),node('span',`${items.filter(r=>r.status===activeTab).length} título(s) nesta aba · ${selected.size} selecionado(s)`));panel.append(count);
+ count.append(node('h2',activeTab==='pending'?'Boletos pendentes':activeTab==='sent'?'Boletos cobrados':activeTab==='cancelled'?'Boletos cancelados':'Boletos pagos'),node('span',`${items.filter(r=>displayStatus(r)===activeTab).length} título(s) nesta aba · ${selected.size} selecionado(s)`));panel.append(count);
  const cards=node('div',undefined,'sicoob-cards');
  const term=clean($('search').value);
- const visible=items.filter(x=>x.status===activeTab&&clean(x.company+' '+x.reference+' '+(x.external_reference||'')).includes(term));
+ const visible=items.filter(x=>displayStatus(x)===activeTab&&clean(x.company+' '+x.reference+' '+(x.external_reference||'')).includes(term));
  for(const r of visible){
   const card=node('article',undefined,'sicoob-card');
   const cb=node('input');cb.type='checkbox';cb.className='sicoob-card-check';cb.setAttribute('aria-label',`Selecionar boleto ${r.reference}`);
@@ -375,8 +376,8 @@ function render(){
   const identity=node('div',undefined,'sicoob-card-identity');identity.append(cb,company);
   const details=node('div',undefined,'sicoob-card-details');
   const field=(label,value,cls='')=>{const el=node('div',undefined,'sicoob-card-field '+cls);el.append(node('span',label),node('strong',value));return el;};
-  details.append(field('Vencimento',r.due_date.split('-').reverse().join('/'),'sicoob-card-due'),field('Valor',fmt(r.amount),'sicoob-card-amount'));
-  const status=field('Situação',r.status==='paid'?'Pago':r.status==='sent'?'Cobrado':'Pendente','sicoob-card-state');
+  details.append(field('Saldo pendente',fmt(HSN_MONEY.balance(r,'receivable').pending)));details.append(field('Vencimento',r.due_date.split('-').reverse().join('/'),'sicoob-card-due'),field('Valor',fmt(r.amount),'sicoob-card-amount'));
+  const status=field('Situação',r.cancelled_at?'Cancelado':Number(r.paid_amount)>0&&r.status!=='paid'?'Recebimento parcial':r.status==='paid'?'Pago':r.status==='sent'?'Cobrança enviada':'Cobrança emitida','sicoob-card-state');
   status.classList.add('sicoob-state-'+r.status);details.append(status);
   const emailRow=node('div',undefined,'sicoob-card-email sicoob-email-multi');
   const savedEmails=emailsFor(contact(r.company));
@@ -399,7 +400,7 @@ function render(){
   preview.classList.add('sicoob-card-preview');
   const individual=button(wasSent(r)?'Reenviar cobrança':'Enviar cobrança individual',()=>prepareIndividual(r));individual.disabled=!eligible(r);individual.title=individual.disabled?'Requer boleto pendente ou cobrado, documento, destinatários e histórico sem tentativas a conferir':'Conferir e enviar cobrança após duas confirmações';actions.append(individual);
   const change=button(r.status==='paid'?'Reabrir boleto':'Marcar pago',()=>setStatus(r,r.status==='paid'?'pending':'paid'));
-  change.classList.add('secondary');actions.append(preview,change);
+  change.textContent='Conferir saldo e recebimentos';change.classList.add('secondary');actions.append(preview,change);if(r.cancelled_at||Number(r.paid_amount)>0&&r.status!=='paid')card.append(node('p',r.cancelled_at?'Título cancelado; envio bloqueado.':'Recebimento parcial: confira saldo em Contas a receber. Reenvio do valor original bloqueado.','sicoob-notice'));
   if(!docNumber(r))card.append(node('p','Número do Documento ausente: reimporte o CSV com a coluna “Seu Número” ou “Número do Documento” antes de enviar.','sicoob-notice'));
   card.append(identity,details,emailRow,actions);cards.append(card);
  }
@@ -407,4 +408,5 @@ function render(){
  panel.append(cards);box.append(panel);
 }
 
-return {load,render,parseCsv:parse};})();
+function reset(){items=[];contacts=[];dispatches=[];sharedAddressBook=[];selected.clear();ready=false;historyError='';busy=false;}
+return {load,render,reset,parseCsv:parse};})();

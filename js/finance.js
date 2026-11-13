@@ -2,7 +2,7 @@
 (function(root){'use strict';
 const D=()=>HSN_DATES;
 const money=n=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(n||0));
-const labels={paid:'Paga',overdue:'Vencida',today:'Vence hoje',upcoming:'A vencer'};
+const labels={partial:'Parcial',cancelled:'Cancelada',paid:'Paga',overdue:'Vencida',today:'Vence hoje',upcoming:'A vencer'};
 // Etapas do trabalho bancário são distintas do pagamento confirmado.
 const workflowOptions=[
  ['pending','Pendente'],
@@ -39,9 +39,10 @@ async function financeSnapshot(){
  financeSnapshotInFlight=promise;
  try{return await promise;}finally{if(financeSnapshotInFlight===promise)financeSnapshotInFlight=null;}
 }
-async function loadFinance(v){if(!user)return;kind=v;const token=++version;month ||= D().today().slice(0,7);$('records').replaceChildren(el('p','Carregando seu financeiro…'));try{requireOnline();const results=await financeSnapshot();if(token!==version||view!==v||!user)return;[data.payables,data.models,data.suppliers,data.types,data.holidays,data.documents,templates]=results;
+async function loadFinance(v){if(!user)return;if(HSN_WORKSPACE.handles(v))return HSN_WORKSPACE.load(v);kind=v;$('records').className='records';$('finance-controls').className='finance-controls';const token=++version;month ||= D().today().slice(0,7);$('records').replaceChildren(el('p','Carregando seu financeiro…'));try{requireOnline();const results=await financeSnapshot();if(token!==version||view!==v||!user)return;[data.payables,data.models,data.suppliers,data.types,data.holidays,data.documents,templates]=results;
  // Detecta se o novo campo foi instalado no Supabase, sem gravar nada.
  if(workflowSupported===null){const probe=await db.from('payables').select('workflow_status').limit(1);workflowSupported=!probe.error;}
+try{data.paymentEvents=await all('hsn10_events');}catch{data.paymentEvents=null;}
 HSN_PHASE3.receive(data,results.slice(7,11));HSN_PHASE4.receive(data,results[11]);HSN_PHASE5.receive(data,results.slice(12,13));HSN_PUSH.receive(results.slice(13));renderFinance();if(selected)renderDocuments();HSN_PHASE3.showDailySummary();}catch(e){if(token!==version||view!==v)return;data.payables=[];$('records').replaceChildren(el('p','Não foi possível consultar. Confira fase-6-push.sql e a conexão.'));failure(e);}}
 
 function supplierPicker(container,suppliers,value=''){
@@ -144,9 +145,9 @@ function reviewPayableDuplicates(){
 function filtered(){if(kind==='calendar'&&['commissions','dda'].includes(HSN_PHASE3.getCalendarModule()))return [];const search=$('search').value.toLocaleLowerCase('pt-BR');return data.payables.filter(p=>p.archived===(kind==='calendar'?false:showArchived)).filter(p=>(kind==='calendar'?p.due_date.slice(0,7):p.competence.slice(0,7))===month).filter(p=>!statusFilter||D().status(p)===statusFilter).filter(p=>kind!=='payables'||!workflowFilter||workflowStage(p)===workflowFilter).filter(p=>!typeFilter||p.type_id===typeFilter).filter(p=>[p.title,supplier(p)?.legal_name,supplier(p)?.trade_name,type(p)?.name,p.document_number].join(' ').toLocaleLowerCase('pt-BR').includes(search)).sort((a,b)=>a.due_date.localeCompare(b.due_date)||a.title.localeCompare(b.title));}
 function stat(title,value,description,cls=''){const card=el('div',undefined,'stat '+cls);card.append(el('small',title),el('strong',money(value)),el('span',description,'muted'));$('summary').append(card);}
 function renderFinance(){document.getElementById('finance-controls')?.classList.toggle('hsn96-dda-controls',view==='dda');HSN_THEME.describe(view);if(!handles(view))return;kind=view;HSN_PHASE3.clearCalendar();
- if(window.HSN90?.handles(kind))return HSN90.render(kind);if(kind==='dashboard')return renderDashboard();if(HSN_PUSH.handles(view))return HSN_PUSH.render();if(HSN_PHASE5.handles(view))return HSN_PHASE5.render();if(HSN_PHASE4.handles(view))return HSN_PHASE4.render();$('new').hidden=false;if(HSN_PHASE3.handles(view))return HSN_PHASE3.render();$('view-title').textContent=titles[kind];$('new').textContent=kind==='calendar'?'Nova conta':'Novo cadastro';document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===kind));$('records').replaceChildren();$('calendar-board').replaceChildren();$('summary').replaceChildren();filterControls();
+ if(window.HSN90?.handles(kind))return HSN90.render(kind);if(kind==='dashboard')return HSN_WORKSPACE.load('dashboard');if(HSN_PUSH.handles(view))return HSN_PUSH.render();if(HSN_PHASE5.handles(view))return HSN_PHASE5.render();if(HSN_PHASE4.handles(view))return HSN_PHASE4.render();$('new').hidden=false;if(HSN_PHASE3.handles(view))return HSN_PHASE3.render();$('view-title').textContent=titles[kind];$('new').textContent=kind==='calendar'?'Nova conta':'Novo cadastro';document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===kind));$('records').replaceChildren();$('calendar-board').replaceChildren();$('summary').replaceChildren();filterControls();
  if(['payables','calendar'].includes(kind)){
- const list=filtered(),open=list.filter(stageIsOpen),paid=list.filter(p=>p.payment_status==='paid'),today=list.filter(p=>stageIsOpen(p)&&D().status(p)==='today'),late=list.filter(p=>stageIsOpen(p)&&D().status(p)==='overdue');const sum=arr=>arr.reduce((total,p)=>total+Number(amount(p)),0);
+ const list=filtered(),open=list.filter(stageIsOpen),paid=list.filter(p=>p.payment_status==='paid'),today=list.filter(p=>stageIsOpen(p)&&D().status(p)==='today'),late=list.filter(p=>stageIsOpen(p)&&D().status(p)==='overdue');const sum=arr=>arr.reduce((total,p)=>total+(p.payment_status==='paid'?HSN_MONEY.balance(p).paid:HSN_MONEY.balance(p).pending),0);
  stat('Pendente · contas',sum(open),open.length+' contas');stat('Pago · contas',sum(paid),paid.length+' contas','green');stat('Hoje · contas',sum(today),today.length+' contas','orange');stat('Vencido · contas',sum(late),late.length+' contas','red');
  if(kind==='calendar'&&calendarMode==='month'){renderCalendar(list);HSN_PHASE3.enhanceCalendar(month,calendarMode);HSN_PHASE4.calendar(month,calendarMode);return;}
  if(kind==='payables'){
@@ -230,6 +231,7 @@ async function bulkArchive(items,restore){const eligible=items.filter(p=>p.archi
 // Baixa administrativa com comprovante opcional. Não executa transações bancárias.
 // O Supabase mantém a regra payables_check: pago exige paid_date e actual_amount.
 function paymentBlockReason(p){
+ if(p.actual_amount==null)return 'confirme primeiro o valor real da conta em Editar';
  if(p.payment_status==='paid')return 'já paga';
  if(p.archived)return 'arquivada';
  if(p.approval_status==='waiting')return 'aguardando aprovação';
@@ -255,11 +257,11 @@ async function bulkMarkPaid(items,defaults={}){
  const dialog=getWorkflowDialog();dialog.replaceChildren();dialog.className='hsn86-workflow-dialog hsn88-paid-dialog';
  const form=el('form');form.className='hsn86-workflow-form hsn88-paid-form';
  form.append(el('h2','Confirmar pagamentos selecionados'),el('p',eligible.length+' conta(s) elegível(is). O HSN registrará a baixa, mas NÃO realizará pagamentos no banco.','hsn88-help'));
- const total=eligible.reduce((n,p)=>n+Number(amount(p)),0);
+ const total=eligible.reduce((n,p)=>n+HSN_MONEY.balance(p).pending,0);
  form.append(el('strong','Total apresentado: '+money(total),'hsn88-total'));
  if(rejected.length){const skipped=el('details',undefined,'hsn88-skipped');skipped.append(el('summary',rejected.length+' conta(s) não serão alteradas'));for(const p of rejected)skipped.append(el('p',p.title+': '+paymentBlockReason(p)));form.append(skipped);}
- const dateLabel=el('label','Data efetiva do pagamento (para todas)');const date=el('input');date.type='date';date.required=true;date.value=defaults.date||D().today();dateLabel.append(date);form.append(dateLabel);
- const evidenceLabel=el('label','Como o pagamento foi confirmado?');const evidence=el('select');evidence.required=true;for(const [id,text]of [['','Selecione a origem'],['bank_statement','Extrato ou consulta bancária'],['director_confirmation','Confirmação do diretor'],['manual_check','Conferência administrativa']])evidence.append(new Option(text,id));evidenceLabel.append(evidence);form.append(evidenceLabel);
+ const dateLabel=el('label','Data efetiva do pagamento (para todas)');const date=el('input');date.type='date';date.required=true;date.max=D().today();date.value=defaults.date||D().today();dateLabel.append(date);form.append(dateLabel);
+ const evidenceLabel=el('label','Como o pagamento foi confirmado?');const evidence=el('select');evidence.required=true;for(const [id,text]of [['','Selecione a origem'],['bank_statement','Extrato ou consulta bancária'],['director_confirmation','Confirmação do diretor'],['manual_check','Conferência administrativa']])evidence.append(new Option(text,id));evidenceLabel.append(evidence);form.append(evidenceLabel);const reference=inputField(form,'payment_reference','Referência única do pagamento / comprovante',defaults.reference||'','text',true);reference.minLength=3;
  if(defaults.reference){evidence.value='bank_statement';}
  const lacking=eligible.filter(p=>!docs(p).some(d=>d.document_type==='comprovante'));
  if(lacking.length){
@@ -269,7 +271,7 @@ async function bulkMarkPaid(items,defaults={}){
  const entries=el('div',undefined,'hsn88-paid-entries');const rowValues=new Map();
  for(const p of eligible){
   const row=el('div',undefined,'hsn88-paid-row');const description=el('div');description.append(el('strong',p.title),el('small',supplier(p)?.trade_name||supplier(p)?.legal_name||'Fornecedor não informado'));
-  const valueLabel=el('label','Valor efetivamente pago (R$)');const input=el('input');input.type='number';input.step='0.01';input.min='0';input.max='999999999999.99';input.required=true;input.value=Number(amount(p)||0).toFixed(2);valueLabel.append(input);row.append(description,valueLabel);
+  const valueLabel=el('label','Valor efetivamente pago (R$)');const input=el('input');input.type='number';input.step='0.01';input.min='0';input.max='999999999999.99';input.required=true;input.value=HSN_MONEY.balance(p).pending.toFixed(2);input.max=HSN_MONEY.balance(p).pending;valueLabel.append(input);row.append(description,valueLabel);
   if(p.actual_amount===null||p.actual_amount===undefined)row.append(el('small','Valor preenchido a partir da estimativa: confira e confirme o valor real.','hsn88-estimate-warning'));
   if(!docs(p).some(d=>d.document_type==='comprovante'))row.append(el('small','Sem comprovante anexado','hsn88-no-proof'));
   entries.append(row);rowValues.set(p.id,input);
@@ -279,21 +281,19 @@ async function bulkMarkPaid(items,defaults={}){
  const controls=el('div',undefined,'hsn86-dialog-actions');const cancel=button('Cancelar',()=>dialog.close());cancel.type='button';const save=button('Registrar '+eligible.length+' pagamento(s)',()=>{},'primary');save.type='submit';controls.append(cancel,save);form.append(controls);
  form.addEventListener('submit',async event=>{event.preventDefault();
   try{
-   D().parse(date.value);if(!evidence.value)throw Error('Selecione como confirmou o pagamento.');
+   D().parse(date.value);if(date.value>D().today())throw Error('Data futura não confirma pagamento.');if(!evidence.value)throw Error('Selecione como confirmou o pagamento.');
    if(lacking.length&&note.value.trim().length<8)throw Error('Para contas sem comprovante, informe uma observação com pelo menos 8 caracteres.');
-   const plans=eligible.map(p=>{const value=Number(rowValues.get(p.id).value);if(!Number.isFinite(value)||value<0)throw Error(p.title+': informe um valor real válido.');return {p,value:Math.round(value*100)/100};});
+   const plans=eligible.map(p=>{const value=Number(rowValues.get(p.id).value);if(!Number.isFinite(value)||value<=0||value>HSN_MONEY.balance(p).pending)throw Error(p.title+': informe um valor real válido.');return {p,value:Math.round(value*100)/100,request:crypto.randomUUID()};});
    const sum=plans.reduce((n,r)=>n+r.value,0);
    if(!confirm('CONFIRMAR BAIXA FINANCEIRA\n\n'+plans.length+' conta(s) · '+money(sum)+'\nData: '+D().br(date.value)+'\n'+lacking.length+' sem comprovante anexado.\n\nConfirma que TODOS estes pagamentos já ocorreram no banco?'))return;
    save.disabled=true;dialog.close();
    await operation(async()=>{
     let done=0;const errors=[];
-    for(const {p,value} of plans){try{
+    for(const {p,value,request} of plans){try{
      const live=check(await db.from('payables').select('updated_at,payment_status,workflow_status,archived,workflow_note,notes,actual_amount').eq('id',p.id).eq('owner_id',user.id).single());
      if(live.updated_at!==p.updated_at||paymentBlockReason(live))throw Error('registro alterado, pago, cancelado ou aguardando assinatura; atualize a tela');
      const proof=docs(p).some(d=>d.document_type==='comprovante');
-     const audit=paymentAudit(live,date.value,value,evidence.selectedOptions[0]?.textContent||evidence.value,note.value.trim(),proof);
-     const result=check(await db.from('payables').update({payment_status:'paid',paid_date:date.value,actual_amount:value,...audit}).eq('id',p.id).eq('owner_id',user.id).eq('updated_at',p.updated_at).select('id'));
-     if(result.length!==1)throw Error('registro alterado, atualize a tela');done++;
+     check(await db.rpc('hsn10_post_payment',{p_kind:'payable',p_target_id:p.id,p_amount:value,p_date:date.value,p_reference:reference.value,p_request_id:request,p_reason:note.value.trim()||'Pagamento confirmado com comprovante anexado',p_bank_id:null}));done++;
     }catch(err){errors.push(p.title+': '+(err.message||'falha'));}}
     selectedPayables.clear();await loadFinance(view);
     notice(done+' pagamento(s) registrado(s) após confirmação.'+(errors.length?' '+errors.length+' falha(s): '+errors.slice(0,4).join(' | '):''),errors.length>0);
@@ -325,14 +325,14 @@ function accountTable(list){
  const td=(label,node)=>{const cell=el('td');cell.dataset.label=label;if(typeof node==='string')cell.textContent=node;else cell.append(node);row.append(cell);return cell;};
  const ck=el('input');ck.type='checkbox';ck.className='hsn86-checkbox';ck.checked=selectedPayables.has(p.id);ck.setAttribute('aria-label','Selecionar conta '+p.title);ck.addEventListener('change',()=>{ck.checked?selectedPayables.add(p.id):selectedPayables.delete(p.id);renderFinance();});td('Selecionar',ck);
  const title=el('div');title.append(el('strong',p.title),el('small',p.competence.slice(5,7)+'/'+p.competence.slice(0,4)+' · '+(type(p)?.name||'')));td('Conta',title);
- td('Fornecedor',supplier(p)?.trade_name||supplier(p)?.legal_name||'—');td('Vencimento',D().br(p.due_date));const value=el('div',money(amount(p)),'table-money');if(p.actual_amount===null)value.append(el('small','Valor estimado'));td('Valor',value);
+ td('Fornecedor',supplier(p)?.trade_name||supplier(p)?.legal_name||'—');td('Vencimento',D().br(p.due_date));const value=el('div',money(amount(p)),'table-money');if(Number(p.paid_amount)>0)value.append(el('small','Pago: '+money(p.paid_amount)),el('small','Saldo: '+money(HSN_MONEY.balance(p).pending)));if(p.actual_amount===null)value.append(el('small','Valor estimado'));td('Valor',value);
  const step=el('span',workflowName(p),'hsn86-stage hsn86-stage-'+workflowStage(p));td('Etapa bancária',step);
  td('Prazo',el('span',workflowStage(p)==='cancelled'?'—':labels[D().status(p)],'pill '+(workflowStage(p)==='cancelled'?'':D().status(p))));
  const files=el('div');files.append(el('span',docs(p).length+' anexo(s)'));if(missing(p).length)files.append(el('small','Falta: '+missing(p).map(k=>docNames[k]).join(', '),'table-doc-warning'));if(p.bank_scheduled_date)files.append(el('small','Programado: '+D().br(p.bank_scheduled_date)));td('Documentos',files);
  const details=el('details',undefined,'table-actions');details.append(el('summary','Ações'));details.append(accountCard(p).querySelector('.actions'));td('Ações',details);body.append(row);
  }table.append(body);wrap.append(table);return wrap;
 }
-function accountCard(p){const card=el('article',undefined,'record');const accent=el('div',undefined,'record-accent');accent.style.backgroundColor=type(p)?.color||'#ee790c';card.append(accent,el('span',workflowName(p),'hsn86-stage hsn86-stage-'+workflowStage(p)));if(p.actual_amount===null)card.append(el('span','Estimado','pill'));if(missing(p).length)card.append(el('span',missing(p).length+' doc. pendente(s)','pill missing'));card.append(el('h2',p.title),el('p',supplier(p)?.trade_name||supplier(p)?.legal_name||''));const meta=el('div',undefined,'meta');meta.append(el('span','Vence '+D().br(p.due_date),'muted'),el('span',p.competence.slice(5,7)+'/'+p.competence.slice(0,4),'muted'));card.append(meta,el('div',money(amount(p)),'money'));if(missing(p).length)card.append(el('p','Faltam: '+missing(p).map(k=>docNames[k]).join(', '),'muted'));if(p.approval_status==='waiting')card.append(el('span','Aguardando aprovação','pill missing'));if(p.approval_status==='received')card.append(el('span','Aprovação recebida','pill paid'));const actions=el('div',undefined,'actions');actions.append(button('Editar',()=>editor(p)),button('Anexos ('+docs(p).length+')',()=>openDocuments(p)),button('Alterar etapa',()=>editWorkflow([p])));if(!p.archived&&p.payment_status!=='paid'&&workflowStage(p)!=='cancelled')actions.append(button('Marcar paga',()=>markPaid(p),'primary'));const wa=button('WhatsApp',()=>accountWhatsApp(p,false));wa.disabled=!(supplier(p)?.contacts||[]).some(c=>HSN_UTILS.whatsappNumber(c.whatsapp).valid);actions.append(wa);const second=button('2ª via',()=>accountWhatsApp(p,true));second.disabled=wa.disabled;actions.append(second);if(p.approval_status==='waiting')actions.append(button('Registrar aprovação',()=>recordApproval(p)));actions.append(button(p.archived?'Restaurar':'Arquivar',()=>archive(p),'danger'));card.append(actions);return card;}
+function accountCard(p){const card=el('article',undefined,'record');const accent=el('div',undefined,'record-accent');accent.style.backgroundColor=type(p)?.color||'#ee790c';card.append(accent,el('span',workflowName(p),'hsn86-stage hsn86-stage-'+workflowStage(p)));if(p.actual_amount===null)card.append(el('span','Estimado','pill'));if(missing(p).length)card.append(el('span',missing(p).length+' doc. pendente(s)','pill missing'));card.append(el('h2',p.title),el('p',supplier(p)?.trade_name||supplier(p)?.legal_name||''));const meta=el('div',undefined,'meta');meta.append(el('span','Vence '+D().br(p.due_date),'muted'),el('span',p.competence.slice(5,7)+'/'+p.competence.slice(0,4),'muted'));card.append(meta,el('div',money(amount(p)),'money'));if(missing(p).length)card.append(el('p','Faltam: '+missing(p).map(k=>docNames[k]).join(', '),'muted'));if(p.approval_status==='waiting')card.append(el('span','Aguardando aprovação','pill missing'));if(p.approval_status==='received')card.append(el('span','Aprovação recebida','pill paid'));const actions=el('div',undefined,'actions');actions.append(button('Histórico de pagamentos',()=>HSN_WORKSPACE.openPaymentHistory('payable',p)),button('Editar',()=>editor(p)),button('Anexos ('+docs(p).length+')',()=>openDocuments(p)),button('Alterar etapa',()=>editWorkflow([p])));if(!p.archived&&p.payment_status!=='paid'&&workflowStage(p)!=='cancelled')actions.append(button('Registrar pagamento',()=>markPaid(p),'primary'));const wa=button('WhatsApp',()=>accountWhatsApp(p,false));wa.disabled=!(supplier(p)?.contacts||[]).some(c=>HSN_UTILS.whatsappNumber(c.whatsapp).valid);actions.append(wa);const second=button('2ª via',()=>accountWhatsApp(p,true));second.disabled=wa.disabled;actions.append(second);if(p.approval_status==='waiting')actions.append(button('Registrar aprovação',()=>recordApproval(p)));actions.append(button(p.archived?'Restaurar':'Arquivar',()=>archive(p),'danger'));card.append(actions);return card;}
 function bulkRecurringToolbar(list){
  const box=el('section',undefined,'hsn86-bulkbar hsn88-bulkbar full-width');const picked=list.filter(m=>selectedRecurring.has(m.id));
  box.append(el('h3','Ações em lote — Contas recorrentes'),el('p',picked.length+' selecionada(s) · a mudança não altera competências já geradas.'));

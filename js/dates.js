@@ -10,6 +10,6 @@ function holidays(year,custom=[]){const map=new Map();for(const [s,name]of [['01
 function business(s,custom=[]){const d=parse(s);return ![0,6].includes(d.getUTCDay())&&!holidays(d.getUTCFullYear(),custom).has(s);}
 function adjust(s,rule,custom=[]){if(rule==='keep')return s;if(!['before','after'].includes(rule))throw Error('Regra inválida');let result=s,count=0;while(!business(result,custom)){result=add(result,rule==='before'?-1:1);if(++count>370)throw Error('Não há dia útil disponível');}return result;}
 function br(s){return s?s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4):'—';}
-function status(p){return p.payment_status==='paid'?'paid':p.due_date<today()?'overdue':p.due_date===today()?'today':'upcoming';}
+function status(p){if(p.workflow_status==='cancelled')return 'cancelled';if(Number(p.paid_amount)>0&&p.payment_status!=='paid')return 'partial';return p.payment_status==='paid'?'paid':p.due_date<today()?'overdue':p.due_date===today()?'today':'upcoming';}
 root.HSN_DATES={parse,format,add,today,monthDay,easter,holidays,business,adjust,br,status};
 })(typeof window!=='undefined'?window:globalThis);

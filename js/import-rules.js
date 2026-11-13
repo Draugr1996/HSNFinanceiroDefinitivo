@@ -27,7 +27,7 @@ function match(a,b){const sameValue=Number.isFinite(a.value)&&Number.isFinite(b.
  const partyByTax=!!a.tax&&a.tax===b.tax;
  const partyByName=!!a.supplier&&a.supplier===b.supplier;
  const similar=Math.max(similarity(a.supplierText,b.supplierText),similarity(a.supplierText,b.title),similarity(a.title,b.supplierText),similarity(a.title,b.title));
- const sameParty=partyById||partyByTax||partyByName||similar>=.75;
+ const sameParty=partyById||partyByTax||partyByName;
  const docConflict=!!a.number&&!!b.number&&a.number!==b.number;
  const evidence=[];let risk='review';
  if(a.barcode&&b.barcode&&a.barcode===b.barcode){evidence.push('Linha digitável/código de barras idêntico');risk='block';}
@@ -37,10 +37,10 @@ function match(a,b){const sameValue=Number.isFinite(a.value)&&Number.isFinite(b.
  if(!evidence.length&&sameValue&&sameDate&&sameParty&&docConflict){evidence.push('Mesma empresa, valor e vencimento; documentos distintos — conferir');risk='review';}
  return evidence.length?{risk,reasons:evidence}:null;
 }
-function suspects(candidate,existing,suppliers=[]){const a=canonical(candidate,suppliers);const hits=[];for(const row of existing){if(candidate.id&&row.id===candidate.id)continue;const b=canonical(row,suppliers),m=match(a,b);if(m)hits.push({record:row,reasons:m.reasons,risk:b.archived?'archived':m.risk});}return hits;}
+function suspects(candidate,existing,suppliers=[]){const a=canonical(candidate,suppliers);const hits=[];for(const row of existing){if(candidate.id&&row.id===candidate.id)continue;const b=canonical(row,suppliers),m=match(a,b);if(m)hits.push({record:row,reasons:m.reasons,risk:m.risk});}return hits;}
 function blocking(candidate,existing,suppliers=[]){return suspects(candidate,existing,suppliers).filter(x=>x.risk==='block');}
 function describe(hits,limit=3){return hits.slice(0,limit).map(h=>{const p=h.record;return (p.title||p.supplier_name||'Conta existente')+' · '+(p.due_date||'')+' · R$ '+Number(p.actual_amount??p.estimated_amount??p.amount??0).toFixed(2)+' ('+h.reasons.join(', ')+')';}).join(' | ');}
 function report(records,{start,end,typeId='',supplierId='',status=''}={}){return records.filter(p=>!p.archived&&p.due_date>=start&&p.due_date<=end&&(!typeId||p.type_id===typeId)&&(!supplierId||p.supplier_id===supplierId)&&(!status||HSN_DATES.status(p)===status)).sort((a,b)=>a.due_date.localeCompare(b.due_date)||a.title.localeCompare(b.title));}
-function totals(records){return records.filter(p=>!p.archived).reduce((r,p)=>{const n=Number(p.actual_amount??p.estimated_amount??0);r.total+=n;if(p.payment_status==='paid')r.paid+=n;else r.pending+=n;return r;},{total:0,paid:0,pending:0});}
+function totals(records){return records.reduce((r,p)=>{const b=HSN_MONEY.balance(p);if(b.cancelled){r.cancelled+=b.total;return r;}r.total+=b.total;r.paid+=b.paid;r.pending+=b.pending;return r;},{total:0,paid:0,pending:0,cancelled:0});}
 root.HSN_IMPORT_RULES={normalize,tax,currency,date,competence,canonical,suspects,blocking,describe,tokens,similarity,report,totals};
 })(typeof window!=='undefined'?window:globalThis);

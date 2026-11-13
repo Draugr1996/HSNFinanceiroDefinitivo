@@ -1,6 +1,6 @@
 /* DDA, importação confirmada e relatórios separados. */
 (function(root){'use strict';
-let data=null,dda=[],kind='dda',ddaMonth='',ddaStatus='',archiveFilter=false,editing=null,formMode='',importRows=[],importModule='payables',importFile='',workbook=null,reportStart='',reportEnd='',reportType='',reportSupplier='',reportStatus='',reportModule='payables',hotelImport=false,hotelMatrix=null,importHeaderRow=0;
+let data=null,dda=[],kind='dda',ddaMonth='',ddaStatus='',archiveFilter=false,editing=null,formMode='',importRows=[],importModule='payables',importFile='',importFileHash='',workbook=null,reportStart='',reportEnd='',reportType='',reportSupplier='',reportStatus='',reportModule='payables',hotelImport=false,hotelMatrix=null,importHeaderRow=0;
 const R=()=>HSN_IMPORT_RULES,D=()=>HSN_DATES;
 const money=n=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(n||0));
 const linkedAccount=c=>data?.payables?.find(p=>p.id===(c.converted_payable_id||c.linked_payable_id));
@@ -435,7 +435,7 @@ function renderImports(){const box=el('section',undefined,'card full-width');box
 async function readWorkbook(){if(busy)return;await operation(async()=>{
  const file=$('import-file').files[0];if(!file)throw Error('Selecione a planilha.');
  if(file.size>10485760)throw Error('Use planilha de até 10 MB.');
- hotelImport=false;hotelMatrix=null;importFile=file.name;
+ hotelImport=false;hotelMatrix=null;importFile=file.name;importFileHash=await HSN_WORKSPACE.hashFile(file);
  // O CSV de pagamentos sai com UTF-8 BOM, delimitador ; e campos entre aspas.
  // Ler diretamente evita problemas de separador e não exige editar o CSV.
  if(/\.csv$/i.test(file.name)){
@@ -594,7 +594,7 @@ function prepareHotelPaymentsImport(matrix){
   importRows=[];const seen=new Set();
   for(let i=0;i<source.length;i++){
    const row=source[i],get=k=>String(row[idx[k]]??'').trim();
-   const entry={id:crypto.randomUUID(),line:i+2,payload:null,error:'',suspects:[],selected:false,ack:false,ackPaid:false,importPaid:false,hotel:true};
+   const entry={id:crypto.randomUUID(),line:i+2,payload:null,error:'',suspects:[],warnings:[],selected:false,ack:false,ackPaid:false,importPaid:false,hotel:true};
    try{
     const title=get('descricao'),provider=(get('fornecedor')||title),category=get('categoria')||'Outros';
     if(!title||!provider)throw Error('Descrição/fornecedor obrigatórios');
@@ -637,11 +637,11 @@ function renderHotelImportReview(){
  const toolbar=el('div',undefined,'hsn87-import-toolbar');
  const counter=el('strong','', 'hsn87-import-counter');
  function refreshCounter(){const rows=importRows.filter(r=>r.selected&&!r.error);counter.textContent=rows.length+' selecionada(s) · '+money(rows.reduce((n,r)=>n+Number(r.payload.actual_amount),0));}
- toolbar.append(el('p','As pagas na origem permanecem desmarcadas inicialmente. Se desejar, selecione-as e autorize a baixa usando as datas do CSV; anexo é opcional, mas a confirmação será registrada.','hint'));
+ toolbar.append(el('p','As pagas na origem permanecem desmarcadas inicialmente. A situação do CSV é apenas uma informação: confirme cada pagamento após importar a obrigação.','hint'));
  const actions=el('div',undefined,'hsn87-import-actions');
  actions.append(button('Selecionar não pagas válidas',()=>{for(const r of importRows)r.selected=!r.error&&!r.wasPaid&&!r.suspects.length;renderHotelImportReview();},'secondary'));
  actions.append(button('Selecionar pagas (sem baixa automática)',()=>{for(const r of importRows)r.selected=!r.error&&r.wasPaid&&!r.suspects.length;renderHotelImportReview();},'secondary'));
- actions.append(button('Autorizar baixa das pagas selecionadas',()=>{const paidRows=importRows.filter(r=>r.selected&&!r.error&&r.wasPaid&&r.paidOn);if(!paidRows.length){notice('Selecione contas pagas no CSV que tenham a data de pagamento.',true);return;}const total=paidRows.reduce((n,r)=>n+Number(r.payload.actual_amount),0);if(!confirm('AUTORIZAR BAIXAS DO CSV\n\n'+paidRows.length+' contas · '+money(total)+'\n\nConfirma que essas contas foram EFETIVAMENTE PAGAS e que as datas informadas no arquivo estão corretas? Nenhum pagamento bancário será executado.'))return;paidRows.forEach(r=>{r.importPaid=true;r.ackPaid=true;});renderHotelImportReview();},'secondary'));
+ toolbar.append(el('p','Contas pagas na origem são importadas como obrigações abertas. Depois registre as baixas confirmadas em Contas a pagar, preservando o valor original.','hint'));
  actions.append(button('Desmarcar todas',()=>{for(const r of importRows)r.selected=false;renderHotelImportReview();},'secondary'));
  actions.append(counter);toolbar.append(actions);container.append(toolbar);
  const wrap=el('div',undefined,'hsn87-import-table-wrap');
@@ -722,11 +722,11 @@ async function confirmHotelPaymentsImport(){
   });
   // Uma única inserção de contas evita lote parcialmente gravado. Catálogos criados
   // permanecem reutilizáveis mesmo que a inserção das contas falhe.
-  const added=check(await db.from('payables').insert(payloads).select('id'));
-  if(added.length!==payloads.length)throw Error('Resposta de importação incompleta. Atualize os registros antes de repetir o arquivo.');
+  const result=check(await db.rpc('hsn10_commit_import',{p_batch_id:crypto.randomUUID(),p_kind:'payable',p_filename:importFile,p_file_hash:importFileHash,p_rows:importRows.map(r=>({line:r.line,selected:chosen.includes(r),outcome:r.error?'error':'ignored',message:r.error||'Não selecionada',payload:payloads[chosen.indexOf(r)]||r.payload}))}));HSN_WORKSPACE.showImportResult(result,importFile);const added=result.filter(r=>r.status==='imported'||r.status==='ignored');
+  
   $('import-dialog').close();hotelImport=false;hotelMatrix=null;
   await HSN_FINANCE.load(view);
-  notice(added.length+' conta(s) importada(s), '+paid+' com baixa confirmada · '+catalog.newSuppliers+' fornecedor(es) novo(s) · '+catalog.newTypes+' tipo(s) novo(s).');
+  notice(result.filter(r=>r.status==='imported').length+' importada(s) · '+result.filter(r=>r.status==='ignored').length+' ignorada(s) · '+result.filter(r=>r.status==='error').length+' com erro. Veja o resultado por linha.');
  });
 }
 function renderMapping(sheetName=workbook.SheetNames[0]){const box=$('import-mapping');box.replaceChildren();const sheet=select4(box,'sheet','Aba',workbook.SheetNames.map(s=>[s,s]),sheetName);sheet.onchange=()=>renderMapping(sheet.value);const matrix=XLSX.utils.sheet_to_json(workbook.Sheets[sheetName],{header:1,defval:'',raw:true});if(matrix.length<1){box.append(el('p','Aba vazia.'));return;}if(isHotelPaymentsReport(matrix)){renderHotelPaymentsMapping(matrix);return;}hotelImport=false;if(isSicoobDdaReport(matrix)){
@@ -769,14 +769,11 @@ async function confirmImport(){if(hotelImport)return confirmHotelPaymentsImport(
  const checked=[...importPeers(importModule,freshPayables,freshDda)];for(const r of pending){const blocks=R().blocking(r.payload,checked,data.suppliers);if(blocks.length){r.error=duplicateMessage(blocks);r.selected=false;renderImportReview();throw Error('Importação bloqueada: um ou mais registros já existem. Revise a seleção.');}checked.push(r.payload);const freshWarnings=importedDdaWarnings(r.payload,[...freshDda,...checked]);const newWarnings=freshWarnings.filter(x=>!r.warnings.includes(x));if(newWarnings.length){r.warnings=[...new Set([...r.warnings,...newWarnings])];r.ack=false;renderImportReview();throw Error('Novos alertas surgiram durante a importação. Confira novamente.');}const fresh=R().suspects(r.payload,current,data.suppliers);const oldKeys=new Set(r.suspects.map(h=>h.record.id));if(fresh.some(h=>!oldKeys.has(h.record.id))){r.suspects=fresh;r.ack=false;renderImportReview();throw Error('Surgiram novas suspeitas desde a revisão. Confira e confirme novamente.');}}for(const r of updates){const existingNow=exactDdaReimportMatch(r.payload,freshDda);if(!existingNow||existingNow.id!==r.updateId)throw Error('Título atualizado por outra pessoa ou situação ambígua: '+r.payload.title+'. Reimporte para conferir.');}
  if(!pending.length&&!updates.length){notice('Nada novo a importar.');$('import-dialog').close();return;}
  if(!confirm('Importar '+pending.length+' novo(s) DDA/conta(s) e atualizar '+updates.length+' situação(ões) informada(s) pelo arquivo?\n\nNão será registrada baixa nem agendamento bancário automaticamente.'))return;
- let updated=0;
- for(const r of updates){const original=freshDda.find(c=>c.id===r.updateId);const changes={source_status:r.payload.source_status,source_status_date:r.payload.source_status_date||null,source_file:importFile};
-  const response=check(await db.from('dda_charges').update(changes).eq('owner_id',user.id).eq('id',original.id).eq('updated_at',original.updated_at).select('id'));
-  if(response.length!==1)throw Error('Uma atualização de DDA mudou durante a importação. Nenhuma baixa foi feita. Atualize a lista e confira.');updated++;}
- const inserted=pending.length?check(await db.from(table).insert(pending.map(r=>({...r.payload,owner_id:user.id}))).select('id')):[];
- if(inserted.length!==pending.length)throw Error('Resposta incompleta. Atualize antes de tentar novamente.');$('import-dialog').close();let vendorMessage='';let vendorError=false;
+ let updated=updates.length;
+ const result=chosen.length?check(await db.rpc('hsn10_commit_import',{p_batch_id:crypto.randomUUID(),p_kind:importModule==='dda'?'dda':'payable',p_filename:importFile,p_file_hash:importFileHash,p_rows:importRows.map(r=>({line:r.line,selected:chosen.includes(r),outcome:r.error?'error':'ignored',message:r.error||'Não selecionada',payload:r.payload}))})):[];HSN_WORKSPACE.showImportResult(result,importFile);const inserted=result.filter(r=>r.status==='imported'||r.status==='ignored');
+ $('import-dialog').close();let vendorMessage='';let vendorError=false;
  if(importModule==='dda'){try{const summary=await captureSuppliersFromDda(pending.map(r=>r.payload));vendorMessage=' '+captureSummary(summary);vendorError=summary.problems.length>0;}catch(e){vendorMessage=' Os DDA foram salvos, mas a captura de fornecedores falhou: '+e.message;vendorError=true;}}
- if(importModule==='dda'){view='dda';ddaAllMonths=true;ddaFinanceFilter='all';ddaStatus='';archiveFilter=false;}await HSN_FINANCE.load(view);notice(inserted.length+' novo(s) registro(s), '+updated+' situação(ões) do DDA atualizada(s). Para registrar pagamentos automaticamente, abra Conciliar DDA + extrato e importe o OFX/CSV bancário.'+vendorMessage,vendorError);});}
+ if(importModule==='dda'){view='dda';ddaAllMonths=true;ddaFinanceFilter='all';ddaStatus='';archiveFilter=false;}await HSN_FINANCE.load(view);notice(result.filter(r=>r.status==='imported').length+' importado(s) · '+result.filter(r=>r.status==='ignored').length+' ignorado(s) · '+result.filter(r=>r.status==='error').length+' com erro. Confira o resultado por linha. Baixas somente após conferência do banco.'+vendorMessage,vendorError);});}
 function reportRows(){D().parse(reportStart);D().parse(reportEnd);if(reportEnd<reportStart)throw Error('Data final anterior à inicial.');if(reportModule==='payables')return R().report(data.payables,{start:reportStart,end:reportEnd,typeId:reportType,supplierId:reportSupplier,status:reportStatus});if(reportModule==='dda')return dda.filter(c=>!c.archived&&c.due_date>=reportStart&&c.due_date<=reportEnd&&(!reportStatus||state(c)===reportStatus)).sort((a,b)=>a.due_date.localeCompare(b.due_date));return HSN_PHASE3.commissionRecords().filter(c=>!c.archived&&c.due_date>=reportStart&&c.due_date<=reportEnd&&(!reportStatus||c.review_status===reportStatus)).sort((a,b)=>a.due_date.localeCompare(b.due_date));}
 function exportData(list,module=reportModule){if(module==='payables')return list.map(p=>({id:p.id,descricao:p.title,fornecedor:supplierOf(p)?.legal_name||'',cnpj_cpf:supplierOf(p)?.tax_id||'',tipo:data.types.find(t=>t.id===p.type_id)?.name||'',competencia:p.competence.slice(0,7),vencimento:p.due_date,vencimento_original:p.original_due_date,valor_estimado:Number(p.estimated_amount),valor_real:p.actual_amount===null?'':Number(p.actual_amount),valor_utilizado:Number(p.actual_amount??p.estimated_amount),status:({paid:'Paga',overdue:'Vencida',today:'Vence hoje',upcoming:'A vencer'})[D().status(p)],data_pagamento:p.paid_date||'',numero_documento:p.document_number,codigo_barras:p.barcode,observacoes:p.notes}));if(module==='dda')return list.map(c=>({id:c.id,descricao:c.title,fornecedor:c.supplier_name,cnpj_cpf:c.tax_id,vencimento:c.due_date,valor:Number(c.amount),numero_documento:c.document_number,codigo_barras:c.barcode,conferencia:stateNames[state(c)],situacao_financeira:ddaInsight(c).label,informado_no_arquivo:c.source_status||'',data_informada:c.source_status_date||'',conta_vinculada:c.converted_payable_id||c.linked_payable_id||'',origem:c.source_file,observacoes:c.notes}));return list.map(c=>({id:c.id,descricao:c.title,agencia:c.agency_name,competencia:c.competence.slice(0,7),prazo_conferencia:c.due_date,valor:Number(c.amount),situacao:({pending:'Pendente',in_review:'Em conferência',confirmed:'Conferida'})[c.review_status],data_conferencia:c.confirmed_date||'',referencia:c.document_number,observacoes:c.notes}));}
 function renderReports(){const controls=$('finance-controls');const moduleSelect=select4(controls,'report_module','Módulo',[['payables','Contas a pagar'],['dda','DDA — separado'],['commissions','Comissões — separado']],reportModule);moduleSelect.onchange=()=>{reportModule=moduleSelect.value;reportStatus='';reportType='';reportSupplier='';render();};const start=field4(controls,'report_start','Vencimentos de',reportStart,'date',true),end=field4(controls,'report_end','Até',reportEnd,'date',true);start.onchange=()=>{reportStart=start.value;render();};end.onchange=()=>{reportEnd=end.value;render();};if(reportModule==='payables'){const type=select4(controls,'report_type','Tipo',[['','Todos'],...data.types.map(t=>[t.id,t.name])],reportType);type.onchange=()=>{reportType=type.value;render();};const supplier=select4(controls,'report_supplier','Fornecedor',[['','Todos'],...data.suppliers.map(s=>[s.id,supplierLabel(s)])],reportSupplier);supplier.onchange=()=>{reportSupplier=supplier.value;render();};}

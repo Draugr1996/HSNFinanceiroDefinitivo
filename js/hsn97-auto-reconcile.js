@@ -8,7 +8,7 @@
  const normalize=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
  const cents=v=>Math.round(Number(v)*100);
  const validAmount=v=>Number.isFinite(Number(v))&&Number(v)>0;
- const payableAmount=p=>p?.actual_amount==null?null:Number(p.actual_amount);
+ const payableAmount=p=>p?.actual_amount==null?null:Number(p.actual_amount)-Number(p.paid_amount||0);
  const dayDiff=(a,b)=>{const x=Date.parse(String(a||'')+'T00:00:00Z'),y=Date.parse(String(b||'')+'T00:00:00Z');return Number.isFinite(x)&&Number.isFinite(y)?Math.round((x-y)/86400000):Infinity;};
  const accountStatus=p=>p.payment_status==='paid'?'paid':(['scheduled','scheduled_signature'].includes(p.workflow_status)?'scheduled':'open');
  function matchesSupplier(d,p,s){
